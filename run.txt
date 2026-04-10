@@ -1,0 +1,15 @@
+
+sudo systemctl enable mongod
+
+cd /home/rguktrkvalley/Downloads/hearthealth/backend
+npm start
+
+
+cd /home/rguktrkvalley/Downloads/hearthealth/python-service
+source venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8000
+
+
+cd /home/rguktrkvalley/Downloads/hearthealth/frontend
+npm start
+
