@@ -18,15 +18,16 @@ const app = express();
 const server = http.createServer(app);
 
 const io = new Server(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
+  const io = new Server(server, {
+    cors: {
+      origin: "https://hearthealth-roan.vercel.app",
+      methods: ["GET", "POST"],
+      credentials: true
+    }
+  });
 
 // Middleware
-const cors = require("cors");
+
 
 app.use(cors({
   origin: "https://hearthealth-roan.vercel.app",
