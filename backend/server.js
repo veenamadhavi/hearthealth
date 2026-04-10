@@ -26,8 +26,11 @@ const io = new Server(server, {
 });
 
 // Middleware
+const cors = require("cors");
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: "https://hearthealth-roan.vercel.app",
+  methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
