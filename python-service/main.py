@@ -262,7 +262,9 @@ def signal_to_bpm(sig, fps):
     return bpm
 
 # ─── STEP 7: Full Pipeline ────────────────────────────────────────────────────
-
+@app.get("/")
+async def root():
+    return {"status": "rPPG service running"}
 @app.get("/health")
 async def health():
     return {"status": "STI-rPPG service running", "timestamp": time.time()}

@@ -42,7 +42,10 @@ router.post('/analyze', protect, requireRole('patient'), async (req, res) => {
     } catch (pyError) {
       console.warn('Python service unavailable, using simulation:', pyError.message);
       // Simulate rPPG result for demo when Python service is unavailable
-      const simulatedBPM = Math.floor(Math.random() * 60) + 55; // 55-115 BPM
+      // Realistic resting heart rate simulation
+      const baseBPM = 65 + Math.floor(Math.random() * 20); // 65-85
+      const variation = Math.floor(Math.random() * 10) - 5; // -5 to +5
+      const simulatedBPM = baseBPM + variation;
       heartRateData = {
         heart_rate: simulatedBPM,
         signal_quality: 0.85,
