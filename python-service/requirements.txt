@@ -6,3 +6,4 @@ opencv-contrib-python
 mediapipe
 scipy
 pillow
+PyWavelets
