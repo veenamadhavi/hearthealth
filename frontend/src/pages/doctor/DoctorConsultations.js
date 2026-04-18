@@ -7,111 +7,111 @@ export default function DoctorConsultations() {
   const navigate = useNavigate();
   const [consultations, setConsultations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('All');
 
   useEffect(() => {
-    consultationAPI.doctorAll()
-      .then(r => setConsultations(r.data))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    consultationAPI.getDoctorConsultations().then(r => setConsultations(r.data || [])).finally(() => setLoading(false));
   }, []);
 
   const respond = async (id, status) => {
-    const updated = await consultationAPI.respond(id, { status });
-    setConsultations(prev => prev.map(c => c._id === id ? updated.data : c));
+    try {
+      await consultationAPI.respond(id, { status });
+      setConsultations(prev => prev.map(c => c._id === id ? { ...c, status } : c));
+    } catch (err) { console.error(err); }
   };
 
-  const filtered = filter === 'all' ? consultations : consultations.filter(c => c.status === filter);
-  const statusColor = { Normal: '#10B981', Warning: '#F59E0B', 'High Risk': '#EF4444' };
+  const statusColor = { Normal: '#059669', Warning: '#D97706', 'High Risk': '#DC2626' };
+  const statusBadge = { pending: 'badge-pending', accepted: 'badge-accepted', rejected: 'badge-rejected' };
+  const filtered = filter === 'All' ? consultations : consultations.filter(c => c.status === filter.toLowerCase());
+
+  if (loading) return <div className="loading-screen"><div className="spinner-hh" /></div>;
 
   return (
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
-        <div className="page-header">
-          <h1 className="page-title">All Consultations 📋</h1>
-          <p className="page-subtitle">Manage patient consultation requests</p>
+
+        <div className="page-header-hh animate-fadeInUp">
+          <div className="d-flex align-items-center gap-3">
+            <div style={{ width: 44, height: 44, background: '#059669', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="bi bi-clipboard-pulse-fill" style={{ color: 'white', fontSize: 20 }} />
+            </div>
+            <div>
+              <h2 className="page-title-hh">Consultations</h2>
+              <p className="page-subtitle-hh">Manage patient consultation requests</p>
+            </div>
+          </div>
         </div>
 
-        {/* Filter tabs */}
-        <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-          {['all', 'pending', 'accepted', 'rejected'].map(f => (
-            <button
-              key={f}
-              className={`btn ${filter === f ? 'btn-primary' : 'btn-outline'} btn-sm`}
-              onClick={() => setFilter(f)}
-              style={{ textTransform: 'capitalize' }}
-            >
-              {f}
-              <span style={{
-                background: filter === f ? 'rgba(255,255,255,0.2)' : 'var(--bg-surface)',
-                borderRadius: 10, padding: '1px 7px', fontSize: 11, marginLeft: 4
-              }}>
-                {(f === 'all' ? consultations : consultations.filter(c => c.status === f)).length}
-              </span>
+        {/* Filter */}
+        <div className="d-flex gap-2 mb-4 flex-wrap animate-fadeInUp delay-1">
+          {['All', 'Pending', 'Accepted', 'Rejected'].map(f => (
+            <button key={f} onClick={() => setFilter(f)} style={{
+              padding: '8px 20px', borderRadius: 24, fontSize: 13, fontWeight: 600,
+              cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'DM Sans',
+              border: filter === f ? 'none' : '1.5px solid #E2E8F0',
+              background: filter === f ? '#059669' : 'white',
+              color: filter === f ? 'white' : '#64748B',
+              boxShadow: filter === f ? '0 4px 12px rgba(5,150,105,0.2)' : 'none'
+            }}>
+              {f} ({f === 'All' ? consultations.length : consultations.filter(c => c.status === f.toLowerCase()).length})
             </button>
           ))}
         </div>
 
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="spinner" /></div>
-        ) : filtered.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '60px 32px' }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-            <p style={{ color: 'var(--text-muted)' }}>No consultations in this category</p>
+        {filtered.length === 0 ? (
+          <div className="hh-card text-center py-5 animate-scaleIn">
+            <i className="bi bi-inbox" style={{ fontSize: 48, color: '#CBD5E1' }} />
+            <h5 style={{ fontFamily: 'Poppins', marginTop: 16, color: '#64748B' }}>No consultations</h5>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 750 }}>
-            {filtered.map(c => (
-              <div key={c._id} className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-                  <div>
-                    <h3 style={{ fontSize: 17, marginBottom: 4 }}>{c.patient?.name}</h3>
-                    <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
-                      Age {c.patient?.age} · {c.patient?.occupation} · {c.patient?.email}
-                    </p>
-                  </div>
-                  <span className={`badge badge-${c.status === 'pending' ? 'pending' : c.status === 'accepted' ? 'accepted' : c.status === 'rejected' ? 'rejected' : 'normal'}`} style={{ textTransform: 'capitalize' }}>
-                    {c.status}
-                  </span>
-                </div>
-
-                {c.heartReport && (
-                  <div style={{
-                    display: 'flex', alignItems: 'center', gap: 14,
-                    padding: '12px 16px',
-                    background: `${statusColor[c.heartReport.status]}10`,
-                    border: `1px solid ${statusColor[c.heartReport.status]}30`,
-                    borderRadius: 10, marginBottom: 14
-                  }}>
-                    <span style={{ fontSize: 22 }}>❤️</span>
-                    <div>
-                      <span style={{ fontWeight: 700, fontSize: 18, color: statusColor[c.heartReport.status] }}>
-                        {c.heartReport.heartRate} BPM
-                      </span>
-                      <span className={`badge badge-${c.heartReport.status === 'Normal' ? 'normal' : c.heartReport.status === 'Warning' ? 'warning' : 'danger'}`} style={{ marginLeft: 10, fontSize: 11 }}>
-                        {c.heartReport.status}
-                      </span>
-                      <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>{c.heartReport.explanation}</p>
+          <div className="d-flex flex-column gap-3">
+            {filtered.map((c, i) => (
+              <div key={c._id} className="hh-card animate-fadeInUp" style={{ animationDelay: `${i * 0.08}s`, opacity: 0, borderLeft: `4px solid ${c.status === 'pending' ? '#D97706' : c.status === 'accepted' ? '#059669' : '#DC2626'}` }}>
+                <div className="row align-items-center g-3">
+                  <div className="col-md-5">
+                    <div className="d-flex align-items-center gap-3">
+                      <div style={{ width: 48, height: 48, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, color: '#0B2D6F', fontFamily: 'Poppins', border: '2px solid #BFDBFE', flexShrink: 0 }}>
+                        {c.patient?.name?.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h6 style={{ fontFamily: 'Poppins', fontWeight: 700, margin: 0 }}>{c.patient?.name}</h6>
+                        <p style={{ fontSize: 12, color: '#64748B', margin: '2px 0 4px' }}>
+                          Age {c.patient?.age} &bull; {c.patient?.occupation}
+                        </p>
+                        <div className="d-flex align-items-center gap-2">
+                          <span className={`badge-hh ${statusBadge[c.status]}`}>{c.status}</span>
+                          <span style={{ fontSize: 11, color: '#94A3B8' }}>{new Date(c.createdAt).toLocaleDateString()}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
-
-                <div style={{ display: 'flex', gap: 10 }}>
-                  {c.status === 'pending' && (
-                    <>
-                      <button className="btn btn-success btn-sm" onClick={() => respond(c._id, 'accepted')}>✓ Accept</button>
-                      <button className="btn btn-danger btn-sm" onClick={() => respond(c._id, 'rejected')}>✗ Reject</button>
-                    </>
+                  {c.heartReport && (
+                    <div className="col-md-4">
+                      <div style={{ padding: '10px 14px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                        <div style={{ fontSize: 10, color: '#94A3B8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Heart Report</div>
+                        <div style={{ fontFamily: 'Poppins', fontSize: 20, fontWeight: 800, color: statusColor[c.heartReport.status] }}>{c.heartReport.heartRate} BPM</div>
+                        <span className={`badge-hh badge-${c.heartReport.status === 'Normal' ? 'normal' : c.heartReport.status === 'Warning' ? 'warning' : 'danger'}`} style={{ fontSize: 11 }}>{c.heartReport.status}</span>
+                      </div>
+                    </div>
                   )}
-                  {c.status === 'accepted' && (
-                    <button className="btn btn-primary btn-sm" onClick={() => navigate(`/doctor/chat/${c._id}`)}>
-                      💬 Open Chat
-                    </button>
-                  )}
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 'auto', alignSelf: 'center' }}>
-                    {new Date(c.createdAt).toLocaleDateString()}
-                  </span>
+                  <div className="col-md-3 text-md-end">
+                    {c.status === 'pending' && (
+                      <div className="d-flex flex-column gap-2">
+                        <button className="btn-success-hh btn-full btn-sm-hh" onClick={() => respond(c._id, 'accepted')}>
+                          <i className="bi bi-check-circle me-1" /> Accept
+                        </button>
+                        <button className="btn-danger-hh btn-full btn-sm-hh" onClick={() => respond(c._id, 'rejected')}>
+                          <i className="bi bi-x-circle me-1" /> Decline
+                        </button>
+                      </div>
+                    )}
+                    {c.status === 'accepted' && (
+                      <button className="btn-navy btn-sm-hh" onClick={() => navigate(`/doctor/chat/${c._id}`)}>
+                        <i className="bi bi-chat-fill me-1" /> Open Chat
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

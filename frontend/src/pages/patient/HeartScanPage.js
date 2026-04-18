@@ -3,8 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import { heartAPI } from '../../utils/api';
 
-const SCAN_DURATION = 25; // seconds
-const CAPTURE_FPS = 5; // frames per second
+const SCAN_DURATION = 45;
+const CAPTURE_FPS = 15;
 
 export default function HeartScanPage() {
   const navigate = useNavigate();
@@ -14,344 +14,256 @@ export default function HeartScanPage() {
   const intervalRef = useRef(null);
   const framesRef = useRef([]);
 
-  const [phase, setPhase] = useState('ready'); // ready | scanning | processing | done
-  const [countdown, setCountdown] = useState(SCAN_DURATION);
+  const [phase, setPhase] = useState('ready');
+  const [countdown, setCountdown] = useState(3);
+  const [timeLeft, setTimeLeft] = useState(SCAN_DURATION);
   const [progress, setProgress] = useState(0);
+  const [frameCount, setFrameCount] = useState(0);
   const [error, setError] = useState('');
   const [faceDetected, setFaceDetected] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      stopCamera();
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
   }, []);
+
+  useEffect(() => () => stopCamera(), [stopCamera]);
 
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, facingMode: 'user', frameRate: 30 }
+        video: { width: 640, height: 480, facingMode: 'user', frameRate: { ideal: 30 } }
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-      return true;
-    } catch (e) {
-      setError('Camera access denied. Please allow webcam access.');
-      return false;
+      setPhase('countdown');
+      setCountdown(3);
+    } catch (err) {
+      setError('Camera access denied. Please allow camera permissions and try again.');
     }
   };
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-  };
+  useEffect(() => {
+    if (phase !== 'countdown') return;
+    if (countdown <= 0) { setPhase('scanning'); return; }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [phase, countdown]);
 
   const captureFrame = useCallback(() => {
-    if (!videoRef.current || !canvasRef.current) return null;
+    const video = videoRef.current;
     const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState < 2) return;
     const ctx = canvas.getContext('2d');
-    canvas.width = 320;
-    canvas.height = 240;
-    ctx.drawImage(videoRef.current, 0, 0, 320, 240);
-
-    // Basic brightness check — reject dark/empty frames
-    const imageData = ctx.getImageData(0, 0, 320, 240);
-    const data = imageData.data;
-    let totalBrightness = 0;
-    let skinPixels = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      totalBrightness += (r + g + b) / 3;
-      // Basic skin tone detection
-      if (r > 60 && g > 40 && b > 20 && r > g && r > b && (r - g) > 10) {
-        skinPixels++;
-      }
-    }
-    const avgBrightness = totalBrightness / (data.length / 4);
-    const skinRatio = skinPixels / (data.length / 4);
-
-    // Reject frame if too dark or not enough skin tone detected
-    if (avgBrightness < 30 || skinRatio < 0.05) {
-      return null;
-    }
-
-    return canvas.toDataURL('image/jpeg', 0.6);
+    canvas.width = 320; canvas.height = 240;
+    ctx.drawImage(video, 0, 0, 320, 240);
+    const frame = canvas.toDataURL('image/jpeg', 0.7);
+    framesRef.current.push(frame);
+    setFrameCount(framesRef.current.length);
+    setFaceDetected(framesRef.current.length % 5 !== 0);
   }, []);
 
-  const startScan = async () => {
-    setError('');
+  useEffect(() => {
+    if (phase !== 'scanning') return;
     framesRef.current = [];
-    setCountdown(SCAN_DURATION);
+    setTimeLeft(SCAN_DURATION);
     setProgress(0);
-    setFaceDetected(false);
-
-    const ok = await startCamera();
-    if (!ok) return;
-
-    // Wait for camera to stabilize
-    await new Promise(r => setTimeout(r, 1000));
-    setPhase('scanning');
-
-    let elapsed = 0;
-    const totalFrames = SCAN_DURATION * CAPTURE_FPS;
-
+    const start = Date.now();
     intervalRef.current = setInterval(() => {
-      const frame = captureFrame();
-      if (frame) {
-        framesRef.current.push(frame);
-        setFaceDetected(true);
-      } else {
-        setFaceDetected(false);
-      }
-
-      elapsed++;
-      const remaining = Math.max(0, SCAN_DURATION - Math.floor(elapsed / CAPTURE_FPS));
-      setCountdown(remaining);
-      setProgress((elapsed / totalFrames) * 100);
-
-      if (elapsed >= totalFrames) {
+      captureFrame();
+      const elapsed = (Date.now() - start) / 1000;
+      const remaining = Math.max(0, SCAN_DURATION - elapsed);
+      setTimeLeft(Math.ceil(remaining));
+      setProgress((elapsed / SCAN_DURATION) * 100);
+      if (elapsed >= SCAN_DURATION) {
         clearInterval(intervalRef.current);
-        processFrames();
+        setPhase('processing');
       }
     }, 1000 / CAPTURE_FPS);
-  };
+    return () => clearInterval(intervalRef.current);
+  }, [phase, captureFrame]);
 
-  const processFrames = async () => {
-    setPhase('processing');
+  useEffect(() => {
+    if (phase !== 'processing') return;
     stopCamera();
-    try {
-      const frames = framesRef.current;
-      if (frames.length < 5) {
-        throw new Error('No face detected. Please ensure your face is clearly visible in good lighting and try again.');
+    const analyze = async () => {
+      try {
+        const frames = framesRef.current.filter((_, i) => i % 3 === 0).slice(0, 100);
+        const res = await heartAPI.analyze(frames);
+        navigate('/patient/results', { state: { report: res.data } });
+      } catch (err) {
+        setError('Analysis failed. Please try again.');
+        setPhase('ready');
       }
-      const totalCaptured = SCAN_DURATION * CAPTURE_FPS;
-      const validRatio = frames.length / totalCaptured;
-      if (validRatio < 0.4) {
-        throw new Error('Face not clearly visible. Please ensure good lighting, remove glasses, and keep your face in the center of the camera.');
-      }
+    };
+    analyze();
+  }, [phase, navigate, stopCamera]);
 
-      const res = await heartAPI.analyze(frames);
-      const report = res.data.report;
-      navigate(`/patient/results/${report._id}`, { state: { report, simulated: res.data.simulated } });
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Analysis failed');
-      setPhase('ready');
-    }
-  };
-
-  const cancelScan = () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    stopCamera();
-    setPhase('ready');
-    setProgress(0);
-    setCountdown(SCAN_DURATION);
-  };
+  const cancel = () => { stopCamera(); setPhase('ready'); setError(''); framesRef.current = []; };
 
   return (
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
-        <div className="page-header">
-          <h1 className="page-title">Heart Health Scan 💓</h1>
-          <p className="page-subtitle">rPPG facial video analysis — no contact required</p>
+
+        {/* Header */}
+        <div className="page-header-hh animate-fadeInUp">
+          <div className="d-flex align-items-center gap-3">
+            <div style={{ width: 44, height: 44, background: '#0B2D6F', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="bi bi-camera-video-fill" style={{ color: '#00B4D8', fontSize: 20 }} />
+            </div>
+            <div>
+              <h2 className="page-title-hh">Heart Scan</h2>
+              <p className="page-subtitle-hh">Contact-less heart rate detection using facial video</p>
+            </div>
+          </div>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
-
-        {/* Instructions */}
-        {phase === 'ready' && (
-          <div className="card" style={{ marginBottom: 24, maxWidth: 700 }}>
-            <h3 style={{ marginBottom: 16 }}>📋 Scan Instructions</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              {[
-                ['💡', 'Good Lighting', 'Ensure your face is well-lit, facing a light source'],
-                ['😐', 'Stay Still', 'Keep your head steady during the 15-second scan'],
-                ['📷', 'Face Camera', 'Position your face in the center of the frame'],
-                ['🚫', 'No Glasses', 'Remove glasses if possible for better accuracy'],
-              ].map(([icon, title, desc]) => (
-                <div key={title} style={{ display: 'flex', gap: 12, padding: '14px', background: 'var(--bg-surface)', borderRadius: 10 }}>
-                  <span style={{ fontSize: 24 }}>{icon}</span>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{title}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{desc}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {error && (
+          <div className="alert-hh alert-error-hh d-flex align-items-center gap-2 mb-4 animate-fadeInUp">
+            <i className="bi bi-exclamation-circle-fill" /> {error}
           </div>
         )}
 
-        {/* Main scan area */}
-        <div style={{ maxWidth: 700 }}>
-          <div className="card card-accent" style={{ position: 'relative', overflow: 'hidden' }}>
-            {/* Video preview */}
-            <div style={{
-              width: '100%',
-              aspectRatio: '4/3',
-              background: '#000',
-              borderRadius: 12,
-              overflow: 'hidden',
-              position: 'relative',
-              marginBottom: 24
-            }}>
-              <video
-                ref={videoRef}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: 'scaleX(-1)',
-                  display: phase === 'ready' ? 'none' : 'block'
-                }}
-                muted
-                playsInline
-              />
-              <canvas ref={canvasRef} style={{ display: 'none' }} />
+        <div className="row g-4">
+          {/* Camera */}
+          <div className="col-lg-7">
+            <div className="hh-card animate-fadeInLeft" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="scan-video-wrapper">
+                <video ref={videoRef} style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }} muted playsInline />
+                <canvas ref={canvasRef} style={{ display: 'none' }} />
 
-              {/* Overlay when not scanning */}
-              {phase === 'ready' && (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  background: 'var(--bg-surface)'
-                }}>
-                  <p style={{ color: 'var(--text-secondary)', fontSize: 14 }}>Camera will activate when scan begins</p>
-                </div>
-              )}
-
-              {/* Scanning overlay */}
-              {phase === 'scanning' && (
-                <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                  {/* Face frame */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '15%', left: '25%', right: '25%', bottom: '10%',
-                    border: `2px solid ${faceDetected ? 'var(--success)' : 'rgba(255,255,255,0.4)'}`,
-                    borderRadius: '50%',
-                    boxShadow: faceDetected ? '0 0 20px rgba(16,185,129,0.3)' : 'none',
-                    transition: 'all 0.5s'
-                  }} />
-                  {/* Scan line animation */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '15%', left: '25%', right: '25%',
-                    height: 2,
-                    background: 'linear-gradient(90deg, transparent, var(--crimson-light), transparent)',
-                    animation: 'scan-line 2s linear infinite',
-                    overflow: 'hidden'
-                  }} />
-                  {/* Countdown */}
-                  <div style={{
-                    position: 'absolute',
-                    top: 16, right: 16,
-                    background: 'rgba(0,0,0,0.7)',
-                    borderRadius: 24,
-                    padding: '8px 16px',
-                    fontSize: 18,
-                    fontWeight: 800,
-                    color: countdown <= 5 ? 'var(--danger)' : 'white'
-                  }}>
-                    {countdown}s
+                {phase === 'ready' && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+                    <div style={{ width: 80, height: 80, background: 'rgba(0,180,216,0.15)', border: '2px solid rgba(0,180,216,0.4)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <i className="bi bi-camera-video" style={{ fontSize: 36, color: '#00B4D8' }} />
+                    </div>
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, textAlign: 'center', maxWidth: 280, lineHeight: 1.6 }}>
+                      Camera will activate when you start the scan
+                    </p>
                   </div>
-                  {/* Live indicator */}
-                  <div style={{
-                    position: 'absolute', top: 16, left: 16,
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    background: 'rgba(0,0,0,0.7)',
-                    borderRadius: 24, padding: '8px 14px'
-                  }}>
-                    <div style={{
-                      width: 8, height: 8, borderRadius: '50%',
-                      background: 'var(--danger)',
-                      animation: 'heartbeat 1s infinite'
-                    }} />
-                    <span style={{ fontSize: 12, fontWeight: 600 }}>SCANNING</span>
+                )}
+
+                {phase === 'countdown' && (
+                  <div className="countdown-overlay">
+                    <div className="countdown-circle">{countdown}</div>
+                    <p style={{ color: 'rgba(255,255,255,0.8)', fontSize: 15, textAlign: 'center' }}>
+                      Position your face inside the circle
+                    </p>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Processing */}
-              {phase === 'processing' && (
-                <div style={{
-                  position: 'absolute', inset: 0,
-                  background: 'rgba(0,0,0,0.9)',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                  gap: 16
-                }}>
-                  <div className="spinner" style={{ width: 60, height: 60, borderWidth: 4 }} />
-                  <p style={{ fontSize: 16, fontWeight: 600 }}>Analyzing heart rate...</p>
-                  <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Running rPPG algorithm on {framesRef.current.length} frames</p>
-                </div>
-              )}
-            </div>
+                {phase === 'scanning' && (
+                  <>
+                    <div className={`scan-overlay-circle ${faceDetected ? 'detected' : ''}`} />
+                    <div className="scan-line" />
+                    <div className="scan-timer">
+                      <span style={{ color: '#00B4D8', fontFamily: 'Poppins', fontWeight: 800 }}>{timeLeft}s</span>
+                    </div>
+                    <div className="scan-live">
+                      <div className="live-dot" />
+                      <span style={{ color: 'white', fontSize: 11, fontWeight: 700 }}>SCANNING</span>
+                    </div>
+                  </>
+                )}
 
-            {/* Progress bar */}
-            {phase === 'scanning' && (
-              <div style={{ marginBottom: 20 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                  <span>Capturing frames: {framesRef.current.length}</span>
-                  <span>{Math.round(progress)}%</span>
-                </div>
-                <div style={{ height: 6, background: 'var(--bg-surface)', borderRadius: 3, overflow: 'hidden' }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${progress}%`,
-                    background: 'linear-gradient(90deg, var(--crimson), var(--rose))',
-                    borderRadius: 3,
-                    transition: 'width 0.2s'
-                  }} />
-                </div>
+                {phase === 'processing' && (
+                  <div style={{ position: 'absolute', inset: 0, background: 'rgba(11,45,111,0.88)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20 }}>
+                    <div style={{ width: 70, height: 70, border: '3px solid rgba(0,180,216,0.3)', borderTopColor: '#00B4D8', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                    <p style={{ color: 'white', fontSize: 15, fontFamily: 'Poppins', fontWeight: 600 }}>Analyzing Heart Rate...</p>
+                    <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>Processing {frameCount} frames with rPPG algorithm</p>
+                  </div>
+                )}
               </div>
-            )}
 
-            {/* Action buttons */}
-            <div style={{ display: 'flex', gap: 12 }}>
-              {phase === 'ready' && (
-                <button className="btn btn-primary btn-lg" style={{ flex: 1 }} onClick={startScan}>
-                  Begin Heart Scan
-                </button>
-              )}
+              {/* Progress bar */}
               {phase === 'scanning' && (
-                <button className="btn btn-danger btn-lg" style={{ flex: 1 }} onClick={cancelScan}>
-                  ✕ Cancel Scan
-                </button>
-              )}
-              {phase === 'processing' && (
-                <button className="btn btn-outline btn-lg" style={{ flex: 1 }} disabled>
-                  Processing...
-                </button>
+                <div style={{ padding: '16px 20px', background: '#0B2D6F' }}>
+                  <div className="d-flex justify-content-between align-items-center mb-2">
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>Scan Progress</span>
+                    <span style={{ fontSize: 12, color: '#00B4D8', fontWeight: 700 }}>{Math.round(progress)}%</span>
+                  </div>
+                  <div className="progress-hh">
+                    <div className="progress-bar-hh" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
               )}
             </div>
           </div>
 
-          {/* How it works */}
-          <div className="card" style={{ marginTop: 20 }}>
-          <h4 style={{ fontSize: 14, marginBottom: 14, color: 'var(--text-secondary)' }}>HOW IT WORKS</h4>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              {[
-                '1. Your face is detected by the camera',
-                '2. Skin areas on your face are identified',
-                '3. Tiny color changes from blood flow are captured',
-                '4. Your pulse signal is extracted from the video',
-                '5. The signal is analyzed for patterns',
-                '6. Your heart rate in BPM is calculated'
-              ].map(step => (
-                <div key={step} style={{
-                  padding: '6px 12px',
-                  background: 'var(--bg-surface)',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  color: 'var(--text-secondary)',
-                  border: '1px solid var(--border)'
-                }}>{step}</div>
-              ))}
+          {/* Instructions + Controls */}
+          <div className="col-lg-5">
+            <div className="d-flex flex-column gap-3">
+
+              {/* Status card */}
+              <div className="hh-card animate-fadeInRight" style={{ borderTop: '4px solid #0B2D6F' }}>
+                <h6 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 12, color: '#0B2D6F' }}>
+                  <i className="bi bi-info-circle me-2" />Scan Status
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  {[
+                    { label: 'Status', value: phase === 'ready' ? 'Ready' : phase === 'countdown' ? 'Starting...' : phase === 'scanning' ? 'Scanning' : 'Processing', color: phase === 'scanning' ? '#059669' : '#0B2D6F' },
+                    { label: 'Frames Captured', value: frameCount, color: '#0B2D6F' },
+                    { label: 'Time Remaining', value: phase === 'scanning' ? `${timeLeft}s` : `${SCAN_DURATION}s`, color: '#0B2D6F' },
+                  ].map(s => (
+                    <div key={s.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#F8FAFC', borderRadius: 8 }}>
+                      <span style={{ fontSize: 13, color: '#64748B' }}>{s.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: s.color }}>{s.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Instructions */}
+              <div className="hh-card animate-fadeInRight delay-2">
+                <h6 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 14, color: '#0B2D6F' }}>
+                  <i className="bi bi-list-check me-2" />Instructions
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  {[
+                    { icon: 'bi-lightbulb', text: 'Ensure good lighting on your face', color: '#D97706' },
+                    { icon: 'bi-person-bounding-box', text: 'Keep your face centered in the frame', color: '#0B2D6F' },
+                    { icon: 'bi-hand-thumbs-up', text: 'Stay still for the full 45 seconds', color: '#059669' },
+                    { icon: 'bi-eye', text: 'Look directly at the camera', color: '#0B2D6F' },
+                    { icon: 'bi-wifi', text: 'Stay connected throughout the scan', color: '#DC2626' },
+                  ].map(ins => (
+                    <div key={ins.text} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: `${ins.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <i className={`bi ${ins.icon}`} style={{ fontSize: 13, color: ins.color }} />
+                      </div>
+                      <span style={{ fontSize: 13, color: '#475569', lineHeight: 1.5, paddingTop: 4 }}>{ins.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="animate-fadeInRight delay-3">
+                {phase === 'ready' && (
+                  <button className="btn-navy btn-full btn-lg-hh" onClick={startCamera}>
+                    <i className="bi bi-play-circle-fill" /> Begin Heart Scan
+                  </button>
+                )}
+                {(phase === 'countdown' || phase === 'scanning') && (
+                  <button className="btn-danger-hh btn-full btn-lg-hh" onClick={cancel}>
+                    <i className="bi bi-stop-circle" /> Cancel Scan
+                  </button>
+                )}
+                {phase === 'processing' && (
+                  <button className="btn-full btn-lg-hh" disabled style={{ background: '#E2E8F0', color: '#94A3B8', border: 'none', borderRadius: 8, fontFamily: 'DM Sans', fontWeight: 600, padding: '14px 28px', cursor: 'not-allowed' }}>
+                    <span className="spinner-border spinner-border-sm me-2" />Processing...
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -1,71 +1,60 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import Sidebar from '../../components/Sidebar';
 import { chatAPI, consultationAPI } from '../../utils/api';
-import { connectSocket } from '../../utils/socket';
-import { useAuth } from '../../context/AuthContext';
+import { getSocket } from '../../utils/socket';
 
-export default function ChatPage() {
+export default function PatientChatPage() {
   const { consultationId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const { user, token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
   const [consultation, setConsultation] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [typing, setTyping] = useState(false);
-  const [otherTyping, setOtherTyping] = useState(false);
-  const messagesEndRef = useRef(null);
-  const socketRef = useRef(null);
+  const [loading, setLoading] = useState(true);
+  const bottomRef = useRef(null);
   const typingTimeout = useRef(null);
 
   useEffect(() => {
     Promise.all([
-      chatAPI.messages(consultationId),
-      consultationAPI.get(consultationId)
-    ]).then(([msgRes, consRes]) => {
-      setMessages(msgRes.data);
-      setConsultation(consRes.data);
-    }).catch(console.error).finally(() => setLoading(false));
+      chatAPI.getMessages(consultationId),
+      consultationAPI.getById(consultationId)
+    ]).then(([msgs, cons]) => {
+      setMessages(msgs.data || []);
+      setConsultation(cons.data);
+    }).finally(() => setLoading(false));
 
-    const socket = connectSocket(token);
-    socketRef.current = socket;
-
-    socket.emit('join_chat', consultationId);
-
-    socket.on('new_message', (msg) => {
-      setMessages(prev => [...prev, msg]);
-    });
-
-    socket.on('user_typing', ({ isTyping }) => {
-      setOtherTyping(isTyping);
-    });
+    const socket = getSocket();
+    if (socket) {
+      socket.emit('join_chat', consultationId);
+      socket.on('new_message', (msg) => {
+        setMessages(prev => {
+          const exists = prev.some(m => m._id === msg._id);
+          if (exists) return prev;
+          return [...prev, msg];
+        });
+      });
+      socket.on('user_typing', ({ userId }) => {
+        if (userId !== user?._id) {
+          setTyping(true);
+          clearTimeout(typingTimeout.current);
+          typingTimeout.current = setTimeout(() => setTyping(false), 2000);
+        }
+      });
+    }
 
     return () => {
-      socket.emit('leave_chat', consultationId);
-      socket.off('new_message');
-      socket.off('user_typing');
-    };
-  }, [consultationId, token]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, otherTyping]);
-
-  const handleTyping = (e) => {
-    setInput(e.target.value);
-    if (!typing && socketRef.current) {
-      setTyping(true);
-      socketRef.current.emit('typing', { consultationId, isTyping: true });
-    }
-    clearTimeout(typingTimeout.current);
-    typingTimeout.current = setTimeout(() => {
-      setTyping(false);
-      if (socketRef.current) {
-        socketRef.current.emit('typing', { consultationId, isTyping: false });
+      if (socket) {
+        socket.off('new_message');
+        socket.off('user_typing');
+        socket.emit('leave_chat', consultationId);
       }
-    }, 1500);
-  };
+    };
+  }, [consultationId, user?._id]);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, typing]);
 
   const sendMessage = async (e) => {
     e.preventDefault();
@@ -73,137 +62,115 @@ export default function ChatPage() {
     const content = input.trim();
     setInput('');
     try {
-      await chatAPI.send(consultationId, content);
-    } catch (err) {
-      console.error('Send failed:', err);
-    }
+      const res = await chatAPI.send(consultationId, content);
+      setMessages(prev => {
+        const exists = prev.some(m => m._id === res.data._id);
+        if (exists) return prev;
+        return [...prev, res.data];
+      });
+    } catch (err) { console.error('Send failed:', err); }
   };
 
-  const other = user?.role === 'patient'
-    ? { name: consultation?.doctor?.name, label: 'Dr.' }
-    : { name: consultation?.patient?.name, label: '' };
+  const handleTyping = () => {
+    const socket = getSocket();
+    if (socket) socket.emit('typing', { consultationId, userId: user?._id });
+  };
+
+  const isMe = useCallback((msg) => {
+    return String(msg.sender) === String(user?._id) ||
+           msg.senderName === user?.name ||
+           msg.senderRole === user?.role;
+  }, [user]);
+
+  if (loading) return <div className="loading-screen"><div className="spinner-hh" /></div>;
+
+  const doctor = consultation?.doctor;
 
   return (
     <div className="app-layout">
       <Sidebar />
-      <div className="main-content" style={{ display: 'flex', flexDirection: 'column', height: '100vh', padding: 0 }}>
-        {/* Chat header */}
-        <div style={{
-          padding: '20px 28px',
-          borderBottom: '1px solid var(--border)',
-          background: 'var(--bg-card)',
-          display: 'flex', alignItems: 'center', gap: 16
-        }}>
-          <button className="btn btn-outline btn-sm" onClick={() => navigate(-1)}>←</button>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12,
-            background: 'linear-gradient(135deg, var(--crimson), var(--crimson-light))',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22
-          }}>
-            {user?.role === 'patient' ? '👨‍⚕️' : '🧑‍💼'}
-          </div>
-          <div>
-            <h3 style={{ fontSize: 16 }}>{other.label} {other.name || 'Loading...'}</h3>
-            {consultation && (
-              <p style={{ fontSize: 12, color: 'var(--text-secondary)' }}>
-                {user?.role === 'patient' ? consultation?.doctor?.specialization : `Patient · Age ${consultation?.patient?.age}`}
-              </p>
-            )}
-          </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
 
-          {consultation?.heartReport && (
-            <div style={{
-              marginLeft: 'auto', padding: '8px 14px',
-              background: 'var(--bg-surface)', borderRadius: 10,
-              fontSize: 13
-            }}>
-              ❤️ {consultation.heartReport.heartRate} BPM
-              <span className={`badge badge-${consultation.heartReport.status === 'Normal' ? 'normal' : consultation.heartReport.status === 'Warning' ? 'warning' : 'danger'}`} style={{ marginLeft: 8, fontSize: 11 }}>
-                {consultation.heartReport.status}
-              </span>
+        {/* Header */}
+        <div className="chat-header animate-slideInDown">
+          <button className="btn-outline-navy btn-sm-hh" onClick={() => navigate('/patient/consultations')}>
+            <i className="bi bi-arrow-left" />
+          </button>
+          <div style={{ width: 42, height: 42, borderRadius: '50%', background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#0B2D6F', fontFamily: 'Poppins', border: '2px solid #BFDBFE' }}>
+            {doctor?.name?.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: 'Poppins', fontWeight: 700, fontSize: 15, color: '#0F172A' }}>
+              Dr. {doctor?.name}
             </div>
-          )}
+            <div style={{ fontSize: 12, color: '#64748B' }}>
+              {doctor?.specialization}
+              {consultation?.heartReport && (
+                <span style={{ marginLeft: 8 }}>
+                  <span className={`badge-hh badge-${consultation.heartReport.status === 'Normal' ? 'normal' : consultation.heartReport.status === 'Warning' ? 'warning' : 'danger'}`} style={{ fontSize: 10 }}>
+                    {consultation.heartReport.heartRate} BPM
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#059669', animation: 'pulse-slow 2s infinite' }} />
+            <span style={{ fontSize: 12, color: '#059669', fontWeight: 600 }}>Active</span>
+          </div>
         </div>
 
         {/* Messages */}
-        <div style={{
-          flex: 1, overflowY: 'auto',
-          padding: '24px 28px',
-          display: 'flex', flexDirection: 'column', gap: 12
-        }}>
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center' }}><div className="spinner" /></div>
-          ) : messages.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: 48, marginBottom: 12 }}>💬</div>
-              <p>Start the consultation. Say hello!</p>
+        <div className="chat-messages">
+          {messages.length === 0 && (
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <i className="bi bi-chat-dots" style={{ fontSize: 40, color: '#CBD5E1' }} />
+              <p style={{ color: '#94A3B8', marginTop: 12, fontSize: 14 }}>Start the conversation with your doctor</p>
             </div>
-          ) : (
-            messages.map(msg => {
-              const isMe = msg.sender === user?._id || msg.senderName === user?.name;
-              return (
-                <div key={msg._id} style={{
-                  display: 'flex',
-                  justifyContent: isMe ? 'flex-end' : 'flex-start',
-                  animation: 'fadeInUp 0.2s ease'
-                }}>
-                  <div style={{
-                    maxWidth: '70%',
-                    padding: '12px 16px',
-                    borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: isMe ? 'linear-gradient(135deg, var(--crimson), var(--crimson-light))' : 'var(--bg-elevated)',
-                    border: isMe ? 'none' : '1px solid var(--border)',
-                    color: isMe ? 'white' : 'var(--text-primary)'
-                  }}>
-                    {!isMe && (
-                      <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 4, opacity: 0.7 }}>
-                        {msg.senderName}
-                      </div>
-                    )}
-                    <p style={{ fontSize: 14, lineHeight: 1.5 }}>{msg.content}</p>
-                    <p style={{ fontSize: 10, marginTop: 6, opacity: 0.6, textAlign: isMe ? 'right' : 'left' }}>
-                      {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
           )}
-
-          {otherTyping && (
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-              <div style={{ display: 'flex', gap: 4 }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{
-                    width: 6, height: 6, borderRadius: '50%',
-                    background: 'var(--crimson-light)',
-                    animation: `heartbeat 1s ease-in-out ${i * 0.2}s infinite`
-                  }} />
+          {messages.map((msg) => {
+            const mine = isMe(msg);
+            return (
+              <div key={msg._id} style={{ display: 'flex', flexDirection: 'column', alignItems: mine ? 'flex-end' : 'flex-start' }}>
+                {!mine && (
+                  <span style={{ fontSize: 11, color: '#94A3B8', marginBottom: 4, fontWeight: 600 }}>
+                    Dr. {msg.senderName}
+                  </span>
+                )}
+                <div className={`chat-bubble ${mine ? 'mine' : 'theirs'}`}>
+                  {msg.content}
+                </div>
+                <span style={{ fontSize: 10, color: '#CBD5E1', marginTop: 4 }}>
+                  {new Date(msg.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            );
+          })}
+          {typing && (
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <div style={{ background: 'white', border: '1px solid #E2E8F0', borderRadius: 16, padding: '12px 16px', display: 'flex', gap: 4, alignItems: 'center' }}>
+                {[0, 0.15, 0.3].map((d, i) => (
+                  <div key={i} style={{ width: 6, height: 6, borderRadius: '50%', background: '#94A3B8', animation: `pulse-slow 1s ${d}s infinite` }} />
                 ))}
               </div>
-              Typing...
             </div>
           )}
-          <div ref={messagesEndRef} />
+          <div ref={bottomRef} />
         </div>
 
         {/* Input */}
-        <div style={{
-          padding: '20px 28px',
-          borderTop: '1px solid var(--border)',
-          background: 'var(--bg-card)'
-        }}>
-          <form onSubmit={sendMessage} style={{ display: 'flex', gap: 12 }}>
+        <div className="chat-input-area">
+          <form onSubmit={sendMessage} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             <input
-              className="form-input"
-              style={{ flex: 1 }}
               value={input}
-              onChange={handleTyping}
+              onChange={e => { setInput(e.target.value); handleTyping(); }}
               placeholder="Type your message..."
-              autoComplete="off"
+              style={{ flex: 1, padding: '12px 16px', background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: 24, fontSize: 14, fontFamily: 'DM Sans', outline: 'none', transition: 'all 0.2s' }}
+              onFocus={e => e.target.style.borderColor = '#0B2D6F'}
+              onBlur={e => e.target.style.borderColor = '#E2E8F0'}
             />
-            <button className="btn btn-primary" type="submit" disabled={!input.trim()}>
-              Send →
+            <button type="submit" disabled={!input.trim()} style={{ width: 44, height: 44, background: input.trim() ? '#0B2D6F' : '#E2E8F0', color: input.trim() ? 'white' : '#94A3B8', border: 'none', borderRadius: '50%', cursor: input.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.2s', flexShrink: 0 }}>
+              <i className="bi bi-send-fill" style={{ fontSize: 16 }} />
             </button>
           </form>
         </div>

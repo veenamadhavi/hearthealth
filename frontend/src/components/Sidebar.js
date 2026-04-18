@@ -3,126 +3,81 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const PatientNav = [
-  { path: '/patient/dashboard', icon: '🏠', label: 'Dashboard' },
-  { path: '/patient/scan', icon: '📷', label: 'Heart Scan' },
-  { path: '/patient/history', icon: '📊', label: 'Health History' },
-  { path: '/patient/doctors', icon: '🩺', label: 'Find Doctors' },
-  { path: '/patient/consultations', icon: '💬', label: 'Consultations' },
+  { path: '/patient/dashboard', icon: 'bi-house', label: 'Dashboard' },
+  { path: '/patient/scan', icon: 'bi-camera-video', label: 'Heart Scan' },
+  { path: '/patient/history', icon: 'bi-graph-up', label: 'Health History' },
+  { path: '/patient/doctors', icon: 'bi-people', label: 'Find Doctors' },
+  { path: '/patient/consultations', icon: 'bi-chat-dots', label: 'Consultations' },
 ];
 
 const DoctorNav = [
-  { path: '/doctor/dashboard', icon: '🏠', label: 'Dashboard' },
-  { path: '/doctor/consultations', icon: '📋', label: 'Consultations' },
+  { path: '/doctor/dashboard', icon: 'bi-house', label: 'Dashboard' },
+  { path: '/doctor/consultations', icon: 'bi-clipboard-pulse', label: 'Consultations' },
 ];
 
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const navItems = user?.role === 'doctor' ? DoctorNav : PatientNav;
   const isDoc = user?.role === 'doctor';
+  const navItems = isDoc ? DoctorNav : PatientNav;
 
   return (
     <div className="sidebar">
-
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <div style={{
-          width: 38, height: 38,
-          background: `linear-gradient(135deg, ${isDoc ? '#0891B2, #06B6D4' : '#2563EB, #3B82F6'})`,
-          borderRadius: 10,
-          display: 'flex', alignItems: 'center',
-          justifyContent: 'center', fontSize: 18
-        }}>
-          {isDoc ? '👨‍⚕️' : '🏥'}
+      {/* Brand */}
+      <div className="sidebar-brand">
+        <div className="d-flex align-items-center gap-2">
+          <div className="sidebar-brand-logo">
+            <i className="bi bi-heart-pulse-fill" style={{ color: '#0B2D6F', fontSize: 18 }} />
+          </div>
+          <div className="sidebar-brand-text">
+            Heart<span>Health</span>
+          </div>
         </div>
-        <div>
-          <div style={{
-            fontSize: 14, fontWeight: 700,
-            fontFamily: 'Poppins, sans-serif',
-            color: 'var(--text-primary)'
-          }}>
-            Heart<span style={{ color: isDoc ? '#0891B2' : 'var(--primary)' }}>Health</span>
-          </div>
-          <div style={{
-            fontSize: 11, color: 'var(--text-muted)',
-            fontWeight: 500
-          }}>
-            {isDoc ? 'Doctor Portal' : 'Patient Portal'}
-          </div>
+        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', marginTop: 4, marginLeft: 50 }}>
+          {isDoc ? 'Doctor Portal' : 'Patient Portal'}
         </div>
       </div>
 
       {/* Nav */}
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', padding: '6px 12px', marginBottom: 4 }}>
-        Menu
-      </div>
-
+      <div className="sidebar-section-label">Navigation</div>
       {navItems.map(item => (
         <div
           key={item.path}
-          className={`nav-item ${location.pathname === item.path ? 'active' : ''}`}
+          className={`sidebar-nav-item ${location.pathname === item.path ? 'active' : ''}`}
           onClick={() => navigate(item.path)}
-          style={location.pathname === item.path ? {
-            background: isDoc
-              ? 'rgba(8,145,178,0.1)'
-              : 'rgba(37,99,235,0.1)',
-            color: isDoc ? '#0891B2' : 'var(--primary)',
-            borderColor: isDoc
-              ? 'rgba(8,145,178,0.2)'
-              : 'rgba(37,99,235,0.2)'
-          } : {}}
         >
-          <span className="icon">{item.icon}</span>
+          <i className={`bi ${item.icon}`} />
           {item.label}
         </div>
       ))}
 
       {/* Footer */}
       <div className="sidebar-footer">
-        <div style={{
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 12,
-          padding: '12px 14px',
-          marginBottom: 10
-        }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 10
-          }}>
-            <div style={{
-              width: 36, height: 36,
-              background: `linear-gradient(135deg, ${isDoc ? '#0891B2, #06B6D4' : '#2563EB, #3B82F6'})`,
-              borderRadius: '50%',
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white', fontSize: 14, fontWeight: 700,
-              flexShrink: 0
-            }}>
-              {user?.name?.charAt(0).toUpperCase()}
+        <div className="sidebar-user">
+          <div className="sidebar-avatar">
+            {user?.name?.charAt(0).toUpperCase()}
+          </div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'white', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.name}
             </div>
-            <div style={{ overflow: 'hidden' }}>
-              <div style={{
-                fontSize: 13, fontWeight: 600,
-                color: 'var(--text-primary)',
-                whiteSpace: 'nowrap', overflow: 'hidden',
-                textOverflow: 'ellipsis'
-              }}>{user?.name}</div>
-              <div style={{
-                fontSize: 11, color: 'var(--text-muted)'
-              }}>
-                {isDoc ? user?.specialization : `Age ${user?.age}`}
-              </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+              {isDoc ? user?.specialization : `Age ${user?.age}`}
             </div>
           </div>
         </div>
-
         <button
-          className="btn btn-outline btn-full btn-sm"
           onClick={logout}
-          style={{ color: 'var(--danger)', borderColor: 'rgba(220,38,38,0.2)' }}
+          style={{
+            width: '100%', padding: '9px', background: 'rgba(220,38,38,0.1)',
+            border: '1px solid rgba(220,38,38,0.2)', borderRadius: 8,
+            color: '#FCA5A5', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: 'DM Sans',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+          }}
         >
-          Logout
+          <i className="bi bi-box-arrow-right" /> Logout
         </button>
       </div>
     </div>

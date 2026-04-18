@@ -16,3 +16,20 @@ npm start
 
 App:     https://hearthealth-roan.vercel.app
 Backend: https://hearthealth-backend-api.onrender.com/api/health
+
+
+mongosh "mongodb+srv://hearthealth:hearthealth123@cluster0.rylltgn.mongodb.net/hearthealth"
+# See all patients
+db.patients.find({}, {name:1, email:1}).pretty()
+
+# Delete one patient by email
+db.patients.deleteOne({email: "patient@email.com"})
+
+# Delete one doctor by email
+db.doctors.deleteOne({email: "doctor@email.com"})
+
+# Delete all patients
+db.patients.deleteMany({})
+
+# Delete all doctors
+db.doctors.deleteMany({})

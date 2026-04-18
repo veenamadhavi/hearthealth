@@ -16,87 +16,94 @@ export default function PatientLogin() {
       await login(form.email, form.password, 'patient');
       navigate('/patient/dashboard');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally { setLoading(false); }
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-card animate-fadeInUp">
+    <div className="auth-wrapper">
+      <div className="auth-card">
 
-        {/* Top banner */}
-        <div style={{
-          background: '#0F2552',
-          padding: '32px 34px 28px',
-          textAlign: 'center'
-        }}>
-          <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8,
-            background: 'rgba(56,189,248,0.15)',
-            border: '1px solid rgba(56,189,248,0.25)',
-            borderRadius: 20, padding: '5px 14px',
-            marginBottom: 14
-          }}>
-            <div style={{
-              width: 6, height: 6, borderRadius: '50%',
-              background: '#38BDF8'
-            }} />
-            <span style={{
-              fontSize: 11, color: '#38BDF8',
-              fontWeight: 700, textTransform: 'uppercase',
-              letterSpacing: '0.12em'
-            }}>Patient Portal</span>
+        {/* Header */}
+        <div className="auth-card-header">
+          <div className="auth-role-badge">
+            <div className="auth-role-dot" />
+            <span style={{ fontSize: 11, color: '#00B4D8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+              Patient Portal
+            </span>
           </div>
-          <h2 style={{
-            fontSize: 22, fontWeight: 700,
-            color: 'white',
-            fontFamily: 'Poppins, sans-serif'
-          }}>Welcome Back</h2>
-          <p style={{
-            fontSize: 13,
-            color: 'rgba(255,255,255,0.5)',
-            marginTop: 6
-          }}>Sign in to your patient account</p>
+          <h2 style={{ fontFamily: 'Poppins', fontSize: 24, fontWeight: 700, color: 'white', margin: 0 }}>
+            Welcome Back
+          </h2>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '6px 0 0' }}>
+            Sign in to your patient account
+          </p>
         </div>
 
-        <div className="auth-body">
-          {error && <div className="alert alert-error">{error}</div>}
+        {/* Body */}
+        <div className="auth-card-body">
+          {error && (
+            <div className="alert-hh alert-error-hh d-flex align-items-center gap-2">
+              <i className="bi bi-exclamation-circle-fill" />
+              {error}
+            </div>
+          )}
           <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Email Address</label>
-              <input className="form-input" type="email"
-                value={form.email}
-                onChange={e => setForm({ ...form, email: e.target.value })}
-                placeholder="your@email.com" required />
+            <div className="form-group-hh">
+              <label className="form-label-hh">Email Address</label>
+              <div style={{ position: 'relative' }}>
+                <i className="bi bi-envelope" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: 15 }} />
+                <input
+                  className="form-input-hh"
+                  style={{ paddingLeft: 40 }}
+                  type="email"
+                  value={form.email}
+                  onChange={e => setForm({ ...form, email: e.target.value })}
+                  placeholder="your@email.com"
+                  required
+                />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input className="form-input" type="password"
-                value={form.password}
-                onChange={e => setForm({ ...form, password: e.target.value })}
-                placeholder="Enter your password" required />
+            <div className="form-group-hh">
+              <label className="form-label-hh">Password</label>
+              <div style={{ position: 'relative' }}>
+                <i className="bi bi-lock" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: 15 }} />
+                <input
+                  className="form-input-hh"
+                  style={{ paddingLeft: 40 }}
+                  type="password"
+                  value={form.password}
+                  onChange={e => setForm({ ...form, password: e.target.value })}
+                  placeholder="Enter your password"
+                  required
+                />
+              </div>
             </div>
-            <button className="btn btn-primary btn-full btn-lg"
-              type="submit" disabled={loading}
-              style={{ marginTop: 8 }}>
-              {loading ? 'Signing in...' : 'Sign In'}
+            <button
+              className="btn-navy btn-full btn-lg-hh"
+              type="submit"
+              disabled={loading}
+              style={{ marginTop: 8 }}
+            >
+              {loading
+                ? <><span className="spinner-border spinner-border-sm me-2" /> Signing in...</>
+                : <><i className="bi bi-box-arrow-in-right" /> Sign In</>
+              }
             </button>
           </form>
-          <div style={{
-            borderTop: '1px solid var(--border)',
-            marginTop: 22, paddingTop: 20, textAlign: 'center'
-          }}>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 10 }}>
+
+          <div className="divider-hh">or</div>
+
+          <div className="text-center">
+            <p style={{ fontSize: 14, color: '#475569', marginBottom: 8 }}>
               New patient?{' '}
-              <Link to="/patient/register" style={{
-                color: 'var(--navy)', fontWeight: 700,
-                textDecoration: 'none'
-              }}>Create account</Link>
+              <Link to="/patient/register" style={{ color: '#0B2D6F', fontWeight: 700, textDecoration: 'none' }}>
+                Create account
+              </Link>
             </p>
-            <Link to="/" style={{
-              fontSize: 13, color: 'var(--text-muted)',
-              textDecoration: 'none'
-            }}>Back to home</Link>
+            <Link to="/" style={{ fontSize: 13, color: '#94A3B8', textDecoration: 'none' }}>
+              <i className="bi bi-arrow-left me-1" />Back to home
+            </Link>
           </div>
         </div>
       </div>

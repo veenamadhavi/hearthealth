@@ -7,11 +7,16 @@ const { protect } = require('../middleware/auth');
 // Get messages for a consultation
 router.get('/:consultationId', protect, async (req, res) => {
   try {
-    const messages = await Message.find({ consultation: req.params.consultationId })
-      .sort({ createdAt: 1 });
+    const messages = await Message.find({
+      consultation: req.params.consultationId
+    }).sort({ createdAt: 1 });
+
     res.json(messages);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching messages', error: error.message });
+    res.status(500).json({
+      message: 'Error fetching messages',
+      error: error.message
+    });
   }
 });
 
@@ -22,8 +27,11 @@ router.post('/:consultationId', protect, async (req, res) => {
     const { consultationId } = req.params;
 
     const consultation = await ConsultationRequest.findById(consultationId);
+
     if (!consultation || consultation.status !== 'accepted') {
-      return res.status(400).json({ message: 'Chat not available for this consultation' });
+      return res.status(400).json({
+        message: 'Chat not available for this consultation'
+      });
     }
 
     const message = await Message.create({
@@ -34,15 +42,20 @@ router.post('/:consultationId', protect, async (req, res) => {
       content
     });
 
-    // Emit via socket
+    // ✅ FIXED: Emit to ALL users in room (including sender)
     const io = req.app.get('io');
     if (io) {
-      io.to(`chat_${consultationId}`).emit('new_message', message);
+      console.log("📤 Emitting message to:", `chat_${consultationId}`);
+      io.in(`chat_${consultationId}`).emit('new_message', message);
     }
 
     res.status(201).json(message);
+
   } catch (error) {
-    res.status(500).json({ message: 'Error sending message', error: error.message });
+    res.status(500).json({
+      message: 'Error sending message',
+      error: error.message
+    });
   }
 });
 

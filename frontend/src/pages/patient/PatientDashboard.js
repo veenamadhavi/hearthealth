@@ -12,243 +12,164 @@ export default function PatientDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [latestRes, historyRes] = await Promise.all([
-          heartAPI.latest(),
-          heartAPI.history()
-        ]);
-        setLatestReport(latestRes.data);
-        setHistory(historyRes.data || []);
-      } catch (e) { }
-      finally { setLoading(false); }
-    };
-    fetchData();
+    Promise.all([heartAPI.latest(), heartAPI.history()])
+      .then(([lr, hr]) => { setLatestReport(lr.data); setHistory(hr.data || []); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const statusColor = {
-    Normal: '#059669',
-    Warning: '#D97706',
-    'High Risk': '#DC2626'
-  };
-
-  const statusBg = {
-    Normal: 'rgba(5,150,105,0.08)',
-    Warning: 'rgba(217,119,6,0.08)',
-    'High Risk': 'rgba(220,38,38,0.08)'
-  };
+  const statusColor = { Normal: '#059669', Warning: '#D97706', 'High Risk': '#DC2626' };
+  const statusBg = { Normal: '#D1FAE5', Warning: '#FEF3C7', 'High Risk': '#FEE2E2' };
+  const statusBadge = { Normal: 'badge-normal', Warning: 'badge-warning', 'High Risk': 'badge-danger' };
 
   return (
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
 
-        {/* Header */}
+        {/* Welcome Banner */}
         <div style={{
-          background: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
-          borderRadius: 16, padding: '24px 28px',
-          marginBottom: 28, color: 'white'
-        }}>
-          <h1 style={{
-            fontSize: 24, fontWeight: 700,
-            fontFamily: 'Poppins, sans-serif',
-            marginBottom: 6
-          }}>
-            Welcome, {user?.name?.split(' ')[0]}
-          </h1>
-          <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)' }}>
-            Track your heart health and connect with specialists
-          </p>
-        </div>
-
-        {/* Quick Actions */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr',
-          gap: 16, marginBottom: 24, maxWidth: 580
-        }}>
-          <div
-            className="card"
-            style={{
-              cursor: 'pointer', textAlign: 'center',
-              padding: '28px 20px',
-              border: '1.5px solid rgba(37,99,235,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onClick={() => navigate('/patient/scan')}
-          >
-            <div style={{
-              width: 52, height: 52,
-              background: 'linear-gradient(135deg, #EFF6FF, #DBEAFE)',
-              borderRadius: 14,
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 14px', fontSize: 24
-            }}>📷</div>
-            <h3 style={{
-              fontSize: 15, fontWeight: 700,
-              marginBottom: 6, color: 'var(--text-primary)'
-            }}>Check Heart Health</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Facial video scan
-            </p>
-            <button className="btn btn-primary btn-sm btn-full">
-              Start Scan
-            </button>
-          </div>
-
-          <div
-            className="card"
-            style={{
-              cursor: 'pointer', textAlign: 'center',
-              padding: '28px 20px',
-              border: '1.5px solid rgba(8,145,178,0.2)',
-              transition: 'all 0.2s'
-            }}
-            onClick={() => navigate('/patient/doctors')}
-          >
-            <div style={{
-              width: 52, height: 52,
-              background: 'linear-gradient(135deg, #ECFEFF, #CFFAFE)',
-              borderRadius: 14,
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 14px', fontSize: 24
-            }}>🩺</div>
-            <h3 style={{
-              fontSize: 15, fontWeight: 700,
-              marginBottom: 6, color: 'var(--text-primary)'
-            }}>Consult Doctor</h3>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-              Connect with cardiologists
-            </p>
-            <button className="btn btn-outline btn-sm btn-full">
-              Find Doctors
-            </button>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-label">Total Scans</div>
-            <div className="stat-value" style={{ color: 'var(--primary)' }}>
-              {history.length}
+          background: 'linear-gradient(135deg, #0B2D6F 0%, #1A3F8F 100%)',
+          borderRadius: 16, padding: '28px 32px',
+          marginBottom: 28, position: 'relative', overflow: 'hidden'
+        }}
+          className="animate-fadeInUp"
+        >
+          <div style={{ position: 'absolute', right: -40, top: -40, width: 200, height: 200, borderRadius: '50%', background: 'rgba(0,180,216,0.08)', pointerEvents: 'none' }} />
+          <div className="row align-items-center">
+            <div className="col">
+              <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, marginBottom: 4 }}>
+                Patient Dashboard
+              </p>
+              <h2 style={{ fontFamily: 'Poppins', fontSize: 24, fontWeight: 700, color: 'white', margin: 0 }}>
+                Good day, {user?.name?.split(' ')[0]}
+              </h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '6px 0 0' }}>
+                {user?.occupation} &mdash; Age {user?.age}
+              </p>
             </div>
-            <div className="stat-sub">scans done</div>
+            <div className="col-auto text-end">
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Total Scans</div>
+              <div style={{ fontFamily: 'Poppins', fontSize: 36, fontWeight: 800, color: '#00B4D8', lineHeight: 1 }}>
+                {history.length}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Cards */}
+        <div className="row g-4 mb-4">
+          <div className="col-md-6">
+            <div
+              className="hh-card animate-fadeInUp delay-1"
+              style={{ cursor: 'pointer', borderTop: '4px solid #0B2D6F' }}
+              onClick={() => navigate('/patient/scan')}
+            >
+              <div className="d-flex align-items-center gap-3 mb-3">
+                <div style={{ width: 52, height: 52, background: '#EFF6FF', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="bi bi-camera-video-fill" style={{ fontSize: 22, color: '#0B2D6F' }} />
+                </div>
+                <div>
+                  <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, margin: 0, color: '#0F172A' }}>Check Heart Health</h5>
+                  <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Facial video scan</p>
+                </div>
+              </div>
+              <p style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>
+                Start a 45-second contact-less heart rate scan using your webcam.
+              </p>
+              <button className="btn-navy btn-full">
+                <i className="bi bi-play-circle" /> Start Scan
+              </button>
+            </div>
           </div>
 
-          {latestReport && (
-            <>
-              <div className="stat-card" style={{
-                borderColor: `${statusColor[latestReport.status]}30`
-              }}>
-                <div className="stat-label">Latest Heart Rate</div>
-                <div className="stat-value" style={{
-                  color: statusColor[latestReport.status]
-                }}>
-                  {latestReport.heartRate}
+          <div className="col-md-6">
+            <div
+              className="hh-card animate-fadeInUp delay-2"
+              style={{ cursor: 'pointer', borderTop: '4px solid #059669' }}
+              onClick={() => navigate('/patient/doctors')}
+            >
+              <div className="d-flex align-items-center gap-3 mb-3">
+                <div style={{ width: 52, height: 52, background: '#F0FDF4', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="bi bi-person-badge-fill" style={{ fontSize: 22, color: '#059669' }} />
                 </div>
-                <div className="stat-sub">BPM</div>
-              </div>
-
-              <div className="stat-card">
-                <div className="stat-label">Status</div>
-                <div className="stat-value" style={{
-                  fontSize: 20,
-                  color: statusColor[latestReport.status]
-                }}>
-                  {latestReport.status}
+                <div>
+                  <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, margin: 0, color: '#0F172A' }}>Consult Doctor</h5>
+                  <p style={{ fontSize: 12, color: '#64748B', margin: 0 }}>Connect with specialists</p>
                 </div>
-                <div className="stat-sub">last reading</div>
               </div>
-            </>
-          )}
-
-          <div className="stat-card">
-            <div className="stat-label">Age</div>
-            <div className="stat-value">{user?.age}</div>
-            <div className="stat-sub">{user?.occupation}</div>
+              <p style={{ fontSize: 13, color: '#475569', marginBottom: 16 }}>
+                Consult with Cardiologists and General Physicians online.
+              </p>
+              <button className="btn-full btn-sm-hh" style={{ background: '#059669', color: 'white', border: 'none', borderRadius: 8, fontFamily: 'DM Sans', fontWeight: 600, cursor: 'pointer', padding: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <i className="bi bi-search" /> Find Doctors
+              </button>
+            </div>
           </div>
+        </div>
+
+        {/* Stats Row */}
+        <div className="row g-3 mb-4">
+          {[
+            { label: 'Total Scans', value: history.length, sub: 'health checks', color: '#0B2D6F', icon: 'bi-clipboard-pulse' },
+            latestReport && { label: 'Latest BPM', value: latestReport.heartRate, sub: 'beats per minute', color: statusColor[latestReport.status], icon: 'bi-heart-pulse' },
+            latestReport && { label: 'Health Status', value: latestReport.status, sub: 'last reading', color: statusColor[latestReport.status], icon: 'bi-shield-check' },
+            { label: 'Age', value: user?.age, sub: user?.occupation, color: '#0B2D6F', icon: 'bi-person' },
+          ].filter(Boolean).map((s, i) => (
+            <div className="col-6 col-lg-3" key={s.label}>
+              <div className={`stat-card animate-fadeInUp delay-${i + 1}`} style={{ '--before-color': s.color }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <div className="stat-card-label">{s.label}</div>
+                  <i className={`bi ${s.icon}`} style={{ color: s.color, fontSize: 18 }} />
+                </div>
+                <div className="stat-card-value" style={{ color: s.color, fontSize: 28 }}>{s.value}</div>
+                <div className="stat-card-sub">{s.sub}</div>
+              </div>
+            </div>
+          ))}
         </div>
 
         {/* Latest Report */}
         {latestReport && (
-          <div className="card card-accent" style={{ marginBottom: 20 }}>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between',
-              alignItems: 'center', marginBottom: 18
-            }}>
-              <h3 style={{ fontSize: 16, color: 'var(--text-primary)' }}>
-                Latest Heart Report
-              </h3>
-              <button
-                className="btn btn-outline btn-sm"
-                onClick={() => navigate('/patient/history')}
-              >
-                View History
+          <div className="hh-card hh-card-accent mb-4 animate-fadeInUp delay-3">
+            <div className="d-flex justify-content-between align-items-center mb-3">
+              <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, margin: 0 }}>Latest Heart Report</h5>
+              <button className="btn-outline-navy btn-sm-hh" onClick={() => navigate('/patient/history')}>
+                <i className="bi bi-clock-history" /> View History
               </button>
             </div>
-
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 20,
-              padding: '16px',
-              background: statusBg[latestReport.status],
-              borderRadius: 12,
-              border: `1px solid ${statusColor[latestReport.status]}20`
-            }}>
+            <div className="d-flex align-items-center gap-4">
               <div style={{
-                width: 72, height: 72,
-                background: 'white',
-                border: `2.5px solid ${statusColor[latestReport.status]}`,
-                borderRadius: '50%',
-                display: 'flex', alignItems: 'center',
-                justifyContent: 'center', flexShrink: 0,
-                boxShadow: `0 4px 16px ${statusColor[latestReport.status]}25`
+                width: 80, height: 80, borderRadius: '50%',
+                border: `3px solid ${statusColor[latestReport.status]}`,
+                background: statusBg[latestReport.status],
+                display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                boxShadow: `0 4px 20px ${statusColor[latestReport.status]}30`
               }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{
-                    fontSize: 20, fontWeight: 800,
-                    color: statusColor[latestReport.status],
-                    fontFamily: 'Poppins, sans-serif',
-                    lineHeight: 1
-                  }}>{latestReport.heartRate}</div>
-                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontWeight: 600 }}>BPM</div>
+                <div style={{ fontFamily: 'Poppins', fontSize: 22, fontWeight: 800, color: statusColor[latestReport.status], lineHeight: 1 }}>
+                  {latestReport.heartRate}
                 </div>
+                <div style={{ fontSize: 9, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>BPM</div>
               </div>
-
               <div>
-                <span className={`badge badge-${latestReport.status === 'Normal' ? 'normal' : latestReport.status === 'Warning' ? 'warning' : 'danger'}`}
-                  style={{ marginBottom: 8, display: 'inline-flex' }}>
+                <span className={`badge-hh ${statusBadge[latestReport.status]}`} style={{ marginBottom: 8, display: 'inline-flex' }}>
                   {latestReport.status}
                 </span>
-                <p style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                  {latestReport.explanation}
-                </p>
-                <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                  {new Date(latestReport.createdAt).toLocaleDateString('en-US', {
-                    month: 'long', day: 'numeric', year: 'numeric'
-                  })}
+                <p style={{ fontSize: 14, color: '#475569', margin: 0, lineHeight: 1.6 }}>{latestReport.explanation}</p>
+                <p style={{ fontSize: 12, color: '#94A3B8', marginTop: 4 }}>
+                  <i className="bi bi-calendar3 me-1" />
+                  {new Date(latestReport.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                 </p>
               </div>
             </div>
-
             {latestReport.status !== 'Normal' && (
-              <div style={{
-                marginTop: 14, padding: '12px 16px',
-                background: 'rgba(220,38,38,0.05)',
-                borderRadius: 10,
-                border: '1px solid rgba(220,38,38,0.15)',
-                display: 'flex', alignItems: 'center',
-                justifyContent: 'space-between', gap: 12
-              }}>
-                <p style={{ fontSize: 13, color: '#B91C1C', fontWeight: 500 }}>
-                  Your heart rate is abnormal. Consider consulting a doctor.
-                </p>
-                <button
-                  className="btn btn-danger btn-sm"
-                  style={{ flexShrink: 0 }}
-                  onClick={() => navigate('/patient/doctors')}
-                >
+              <div className="alert-hh alert-warning-hh mt-3 d-flex align-items-center justify-content-between gap-3">
+                <div className="d-flex align-items-center gap-2">
+                  <i className="bi bi-exclamation-triangle-fill" />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Abnormal heart rate detected. Consider consulting a doctor.</span>
+                </div>
+                <button className="btn-danger-hh btn-sm-hh" style={{ flexShrink: 0 }} onClick={() => navigate('/patient/doctors')}>
                   Consult Doctor
                 </button>
               </div>
@@ -256,79 +177,59 @@ export default function PatientDashboard() {
           </div>
         )}
 
-        {/* Recent History */}
+        {/* Recent Readings */}
         {history.length > 0 && (
-          <div className="card">
-            <h3 style={{ fontSize: 16, marginBottom: 18, color: 'var(--text-primary)' }}>
-              Recent Readings
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {history.slice(0, 5).map(r => (
+          <div className="hh-card animate-fadeInUp delay-4">
+            <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 16 }}>Recent Readings</h5>
+            <div className="d-flex flex-column gap-2">
+              {history.slice(0, 4).map(r => (
                 <div key={r._id} style={{
-                  display: 'flex', alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '12px 16px',
-                  background: 'var(--bg-surface)',
-                  borderRadius: 10,
-                  border: '1px solid var(--border)'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', background: '#F8FAFC',
+                  borderRadius: 10, border: '1px solid #E2E8F0',
+                  transition: 'all 0.2s', cursor: 'pointer'
+                }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#EFF6FF'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#F8FAFC'}
+                  onClick={() => navigate(`/patient/results/${r._id}`)}
+                >
+                  <div className="d-flex align-items-center gap-3">
                     <div style={{
                       width: 42, height: 42, borderRadius: '50%',
-                      background: `${statusColor[r.status]}15`,
                       border: `2px solid ${statusColor[r.status]}`,
-                      display: 'flex', alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 13, fontWeight: 700,
-                      color: statusColor[r.status],
-                      fontFamily: 'Poppins, sans-serif'
-                    }}>
-                      {r.heartRate}
-                    </div>
+                      background: statusBg[r.status],
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 800, color: statusColor[r.status],
+                      fontFamily: 'Poppins'
+                    }}>{r.heartRate}</div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>
-                        {r.heartRate} BPM
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                        {new Date(r.createdAt).toLocaleDateString()}
-                      </div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{r.heartRate} BPM</div>
+                      <div style={{ fontSize: 12, color: '#94A3B8' }}>{new Date(r.createdAt).toLocaleDateString()}</div>
                     </div>
                   </div>
-                  <span className={`badge badge-${r.status === 'Normal' ? 'normal' : r.status === 'Warning' ? 'warning' : 'danger'}`}>
-                    {r.status}
-                  </span>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`badge-hh ${statusBadge[r.status]}`}>{r.status}</span>
+                    <i className="bi bi-chevron-right" style={{ color: '#CBD5E1', fontSize: 12 }} />
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* No scans yet */}
+        {/* No scans */}
         {!loading && history.length === 0 && (
-          <div className="card" style={{
-            textAlign: 'center', padding: '52px 32px'
-          }}>
-            <div style={{
-              width: 72, height: 72,
-              background: 'linear-gradient(135deg, #EFF6FF, #DBEAFE)',
-              borderRadius: 20,
-              display: 'flex', alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 20px', fontSize: 32
-            }}>📷</div>
-            <h3 style={{ marginBottom: 8, fontSize: 18 }}>No Heart Scans Yet</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 24, fontSize: 14 }}>
-              Take your first scan using facial video analysis
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => navigate('/patient/scan')}
-            >
-              Start First Scan
+          <div className="hh-card text-center animate-fadeInUp" style={{ padding: '52px 24px' }}>
+            <div style={{ width: 72, height: 72, background: '#EFF6FF', borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px' }}>
+              <i className="bi bi-camera-video" style={{ fontSize: 32, color: '#0B2D6F' }} />
+            </div>
+            <h4 style={{ fontFamily: 'Poppins', marginBottom: 8 }}>No Scans Yet</h4>
+            <p style={{ color: '#64748B', marginBottom: 24, fontSize: 14 }}>Take your first contact-less heart health scan</p>
+            <button className="btn-navy" onClick={() => navigate('/patient/scan')}>
+              <i className="bi bi-play-circle" /> Start First Scan
             </button>
           </div>
         )}
-
       </div>
     </div>
   );

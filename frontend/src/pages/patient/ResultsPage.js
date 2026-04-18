@@ -1,143 +1,171 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import Sidebar from '../../components/Sidebar';
 import { heartAPI } from '../../utils/api';
 
-const STATUS_CONFIG = {
-  Normal: { color: 'var(--success)', bg: 'rgba(16,185,129,0.1)', border: 'rgba(16,185,129,0.3)', icon: '✅', emoji: '💚' },
-  Warning: { color: 'var(--warning)', bg: 'rgba(245,158,11,0.1)', border: 'rgba(245,158,11,0.3)', icon: '⚠️', emoji: '💛' },
-  'High Risk': { color: 'var(--danger)', bg: 'rgba(239,68,68,0.1)', border: 'rgba(239,68,68,0.3)', icon: '🚨', emoji: '❤️' },
-};
-
 export default function ResultsPage() {
-  const { reportId } = useParams();
-  const location = useLocation();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { id } = useParams();
   const [report, setReport] = useState(location.state?.report || null);
-  const simulated = location.state?.simulated;
+  const [loading, setLoading] = useState(!report);
 
   useEffect(() => {
-    if (!report) {
-      heartAPI.report(reportId).then(r => setReport(r.data)).catch(console.error);
+    if (!report && id) {
+      heartAPI.getById(id).then(r => setReport(r.data)).finally(() => setLoading(false));
     }
-  }, [reportId, report]);
+  }, [id, report]);
 
+  if (loading) return <div className="loading-screen"><div className="spinner-hh" /></div>;
   if (!report) return (
     <div className="app-layout">
       <Sidebar />
-      <div className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="spinner" />
+      <div className="main-content d-flex align-items-center justify-content-center">
+        <div className="text-center">
+          <i className="bi bi-exclamation-circle" style={{ fontSize: 48, color: '#DC2626' }} />
+          <h4 style={{ fontFamily: 'Poppins', marginTop: 16 }}>Report not found</h4>
+          <button className="btn-navy mt-3" onClick={() => navigate('/patient/dashboard')}>Go to Dashboard</button>
+        </div>
       </div>
     </div>
   );
 
-  const cfg = STATUS_CONFIG[report.status] || STATUS_CONFIG.Normal;
+  const statusColor = { Normal: '#059669', Warning: '#D97706', 'High Risk': '#DC2626' };
+  const statusBg = { Normal: '#D1FAE5', Warning: '#FEF3C7', 'High Risk': '#FEE2E2' };
+  const statusIcon = { Normal: 'bi-check-circle-fill', Warning: 'bi-exclamation-triangle-fill', 'High Risk': 'bi-x-circle-fill' };
+  const statusBadge = { Normal: 'badge-normal', Warning: 'badge-warning', 'High Risk': 'badge-danger' };
 
   return (
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
-        <div className="page-header">
-          <h1 className="page-title">Heart Scan Results</h1>
-          <p className="page-subtitle">{new Date(report.createdAt).toLocaleString()}</p>
+
+        {/* Header */}
+        <div className="page-header-hh animate-fadeInUp">
+          <div className="d-flex align-items-center gap-3">
+            <button className="btn-outline-navy btn-sm-hh" onClick={() => navigate('/patient/dashboard')}>
+              <i className="bi bi-arrow-left" /> Back
+            </button>
+            <div>
+              <h2 className="page-title-hh">Scan Results</h2>
+              <p className="page-subtitle-hh">Your heart health analysis report</p>
+            </div>
+          </div>
         </div>
 
-        {report.rppgData?.signalQuality < 0.4 && (
-          <div className="alert alert-error" style={{ marginBottom: 20 }}>
-            Low signal quality detected. Results may not be accurate. Please rescan in better lighting.
-          </div>
-        )}
+        <div className="row g-4">
 
-        <div style={{ maxWidth: 600 }}>
-          {/* BPM Display */}
-          <div className="card card-accent animate-fadeInUp" style={{ textAlign: 'center', padding: '48px 32px', marginBottom: 20, borderColor: cfg.border }}>
-            <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
-              {/* Pulse rings */}
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{
-                  position: 'absolute',
-                  width: 140, height: 140,
-                  borderRadius: '50%',
-                  border: `1px solid ${cfg.color}`,
-                  animation: `pulse-ring 2.5s ease-out ${i * 0.5}s infinite`,
-                  opacity: 0
+          {/* BPM Card */}
+          <div className="col-lg-5">
+            <div className="hh-card text-center animate-scaleIn" style={{ padding: '40px 24px', borderTop: `4px solid ${statusColor[report.status]}` }}>
+              {/* Ripple BPM circle */}
+              <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 24px' }}>
+                <div style={{
+                  position: 'absolute', inset: -20, borderRadius: '50%',
+                  border: `2px solid ${statusColor[report.status]}`,
+                  opacity: 0.2, animation: 'ripple 2s ease-out infinite'
                 }} />
-              ))}
-              <div style={{
-                width: 140, height: 140,
-                background: cfg.bg,
-                border: `3px solid ${cfg.color}`,
-                borderRadius: '50%',
-                display: 'flex', flexDirection: 'column',
-                alignItems: 'center', justifyContent: 'center',
-                boxShadow: `0 0 40px ${cfg.color}30`
-              }}>
-                <div style={{ fontSize: 48, fontWeight: 900, fontFamily: 'Syne', color: cfg.color, lineHeight: 1 }}>
-                  {report.heartRate}
+                <div style={{
+                  position: 'absolute', inset: -10, borderRadius: '50%',
+                  border: `2px solid ${statusColor[report.status]}`,
+                  opacity: 0.15, animation: 'ripple 2s ease-out 0.5s infinite'
+                }} />
+                <div style={{
+                  width: 180, height: 180, borderRadius: '50%',
+                  border: `5px solid ${statusColor[report.status]}`,
+                  background: statusBg[report.status],
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 8px 32px ${statusColor[report.status]}30`,
+                  position: 'relative'
+                }}>
+                  <div style={{ fontFamily: 'Poppins', fontSize: 52, fontWeight: 800, color: statusColor[report.status], lineHeight: 1 }}>
+                    {report.heartRate}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>BPM</div>
                 </div>
-                <div style={{ fontSize: 14, color: 'var(--text-secondary)', fontWeight: 500 }}>BPM</div>
               </div>
-            </div>
 
-            <div style={{ fontSize: 32, marginBottom: 12 }}>{cfg.emoji}</div>
-            <h2 style={{ fontSize: 28, color: cfg.color, marginBottom: 8 }}>{report.status}</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: 15, lineHeight: 1.7, maxWidth: 400, margin: '0 auto' }}>
-              {report.explanation}
-            </p>
+              <span className={`badge-hh ${statusBadge[report.status]}`} style={{ fontSize: 14, padding: '6px 18px', marginBottom: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <i className={`bi ${statusIcon[report.status]}`} />
+                {report.status}
+              </span>
+              <p style={{ color: '#475569', fontSize: 14, lineHeight: 1.7 }}>{report.explanation}</p>
 
-            {/* BPM Scale */}
-            <div style={{ marginTop: 28, padding: '20px', background: 'var(--bg-surface)', borderRadius: 12 }}>
-              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 12 }}>Heart Rate Scale</div>
-              <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ flex: 2, background: 'linear-gradient(90deg, #3B82F6, #10B981)', opacity: 0.6 }} />
-                <div style={{ flex: 3, background: 'linear-gradient(90deg, #10B981, #F59E0B)', opacity: 0.6 }} />
-                <div style={{ flex: 2, background: 'linear-gradient(90deg, #F59E0B, #EF4444)', opacity: 0.6 }} />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>
-                <span>{'<50'} Low</span>
-                <span>60-100 Normal</span>
-                <span>{'>'} 100 High</span>
-              </div>
-              {/* Marker */}
-              <div style={{ fontSize: 12, color: cfg.color, marginTop: 8, fontWeight: 600 }}>
-                Your reading: {report.heartRate} BPM
-              </div>
+              {report.simulated && (
+                <div className="alert-hh alert-info-hh mt-3">
+                  <i className="bi bi-info-circle me-2" />
+                  Simulated result — Python service offline
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Scan details */}
-          {report.rppgData && (
-            <div className="card" style={{ marginBottom: 20 }}>
-              <h4 style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 16 }}>SCAN DETAILS</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-                {[
-                  ['Frames Analyzed', report.rppgData.framesAnalyzed || 'N/A', '🎞️'],
-                  ['Signal Quality', report.rppgData.signalQuality ? `${Math.round(report.rppgData.signalQuality * 100)}%` : 'N/A', '📡'],
-                  ['Processing Time', report.rppgData.processingTime ? `${report.rppgData.processingTime.toFixed(1)}s` : 'N/A', '⏱️'],
-                ].map(([label, val, icon]) => (
-                  <div key={label} style={{ textAlign: 'center', padding: '14px', background: 'var(--bg-surface)', borderRadius: 10 }}>
-                    <div style={{ fontSize: 24, marginBottom: 8 }}>{icon}</div>
-                    <div style={{ fontSize: 18, fontWeight: 700 }}>{val}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</div>
-                  </div>
-                ))}
+          {/* Info + Actions */}
+          <div className="col-lg-7">
+            <div className="d-flex flex-column gap-3">
+
+              {/* Details */}
+              <div className="hh-card animate-fadeInRight">
+                <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 16 }}>
+                  <i className="bi bi-file-medical me-2 text-primary" />Report Details
+                </h5>
+                <div className="row g-3">
+                  {[
+                    { label: 'Heart Rate', value: `${report.heartRate} BPM`, icon: 'bi-heart-pulse', color: statusColor[report.status] },
+                    { label: 'Status', value: report.status, icon: 'bi-shield-check', color: statusColor[report.status] },
+                    { label: 'Frames Analyzed', value: `${report.framesAnalyzed || 'N/A'}`, icon: 'bi-camera-video', color: '#0B2D6F' },
+                    { label: 'Signal Quality', value: `${report.signalQuality || 'N/A'}%`, icon: 'bi-wifi', color: '#0B2D6F' },
+                    { label: 'Scan Date', value: new Date(report.createdAt).toLocaleDateString(), icon: 'bi-calendar3', color: '#0B2D6F' },
+                    { label: 'Scan Time', value: new Date(report.createdAt).toLocaleTimeString(), icon: 'bi-clock', color: '#0B2D6F' },
+                  ].map(d => (
+                    <div className="col-6" key={d.label}>
+                      <div style={{ padding: '12px 14px', background: '#F8FAFC', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                          <i className={`bi ${d.icon}`} style={{ color: d.color, fontSize: 13 }} />
+                          <span style={{ fontSize: 11, color: '#64748B', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{d.label}</span>
+                        </div>
+                        <div style={{ fontFamily: 'Poppins', fontSize: 16, fontWeight: 700, color: d.color }}>{d.value}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Normal range reference */}
+              <div className="hh-card animate-fadeInRight delay-2">
+                <h6 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 14 }}>
+                  <i className="bi bi-bar-chart me-2" />Heart Rate Reference
+                </h6>
+                <div className="d-flex flex-column gap-2">
+                  {[
+                    { range: '60 - 100 BPM', label: 'Normal', badge: 'badge-normal', active: report.status === 'Normal' },
+                    { range: '50-59 or 101-120 BPM', label: 'Warning', badge: 'badge-warning', active: report.status === 'Warning' },
+                    { range: 'Below 50 or above 120 BPM', label: 'High Risk', badge: 'badge-danger', active: report.status === 'High Risk' },
+                  ].map(r => (
+                    <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: r.active ? '#F0F9FF' : '#F8FAFC', borderRadius: 9, border: r.active ? '1.5px solid #BFDBFE' : '1px solid #E2E8F0' }}>
+                      <span style={{ fontSize: 13, color: '#475569', fontWeight: r.active ? 600 : 400 }}>{r.range}</span>
+                      <span className={`badge-hh ${r.badge}`}>{r.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Action buttons */}
+              <div className="d-flex gap-2 animate-fadeInRight delay-3">
+                <button className="btn-navy" onClick={() => navigate('/patient/scan')}>
+                  <i className="bi bi-arrow-repeat" /> New Scan
+                </button>
+                <button className="btn-outline-navy" onClick={() => navigate('/patient/history')}>
+                  <i className="bi bi-clock-history" /> View History
+                </button>
+                {report.status !== 'Normal' && (
+                  <button className="btn-danger-hh" onClick={() => navigate('/patient/doctors')}>
+                    <i className="bi bi-people" /> Consult Doctor
+                  </button>
+                )}
               </div>
             </div>
-          )}
-
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => navigate('/patient/scan')}>
-              🔄 New Scan
-            </button>
-            <button className="btn btn-outline" style={{ flex: 1 }} onClick={() => navigate('/patient/history')}>
-              📊 View History
-            </button>
-            {report.status !== 'Normal' && (
-              <button className="btn btn-danger" style={{ flex: 1 }} onClick={() => navigate('/patient/doctors')}>
-                🩺 Consult Doctor
-              </button>
-            )}
           </div>
         </div>
       </div>

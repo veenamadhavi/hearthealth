@@ -1,173 +1,165 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  ReferenceLine, AreaChart, Area
-} from 'recharts';
 import Sidebar from '../../components/Sidebar';
 import { heartAPI } from '../../utils/api';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 
 export default function HistoryPage() {
   const navigate = useNavigate();
-  const [reports, setReports] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('All');
 
   useEffect(() => {
-    heartAPI.history()
-      .then(r => setReports(r.data || []))
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    heartAPI.history().then(r => setHistory(r.data || [])).finally(() => setLoading(false));
   }, []);
 
-  const chartData = reports
-    .slice().reverse()
-    .map((r, i) => ({
-      index: i + 1,
-      bpm: r.heartRate,
-      date: new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      status: r.status
-    }));
+  const statusColor = { Normal: '#059669', Warning: '#D97706', 'High Risk': '#DC2626' };
+  const statusBadge = { Normal: 'badge-normal', Warning: 'badge-warning', 'High Risk': 'badge-danger' };
 
-  const avg = reports.length ? Math.round(reports.reduce((s, r) => s + r.heartRate, 0) / reports.length) : 0;
-  const max = reports.length ? Math.max(...reports.map(r => r.heartRate)) : 0;
-  const min = reports.length ? Math.min(...reports.map(r => r.heartRate)) : 0;
-  const normalCount = reports.filter(r => r.status === 'Normal').length;
+  const filtered = filter === 'All' ? history : history.filter(r => r.status === filter);
+  const chartData = [...history].reverse().slice(-20).map(r => ({
+    date: new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    bpm: r.heartRate, status: r.status
+  }));
 
-  const statusColor = { Normal: '#10B981', Warning: '#F59E0B', 'High Risk': '#EF4444' };
+  const avg = history.length ? Math.round(history.reduce((s, r) => s + r.heartRate, 0) / history.length) : 0;
+  const max = history.length ? Math.max(...history.map(r => r.heartRate)) : 0;
+  const min = history.length ? Math.min(...history.map(r => r.heartRate)) : 0;
+  const normalPct = history.length ? Math.round((history.filter(r => r.status === 'Normal').length / history.length) * 100) : 0;
 
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      const d = payload[0].payload;
-      return (
-        <div style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px' }}>
-          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{d.date}</p>
-          <p style={{ fontSize: 20, fontWeight: 800, color: statusColor[d.status] }}>{d.bpm} BPM</p>
-          <span className={`badge badge-${d.status === 'Normal' ? 'normal' : d.status === 'Warning' ? 'warning' : 'danger'}`} style={{ fontSize: 11, marginTop: 4 }}>
-            {d.status}
-          </span>
-        </div>
-      );
-    }
-    return null;
-  };
+  if (loading) return <div className="loading-screen"><div className="spinner-hh" /></div>;
 
   return (
     <div className="app-layout">
       <Sidebar />
       <div className="main-content">
-        <div className="page-header">
-          <h1 className="page-title">Health History 📊</h1>
-          <p className="page-subtitle">Your heart rate trends over time</p>
+
+        <div className="page-header-hh animate-fadeInUp">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3">
+            <div className="d-flex align-items-center gap-3">
+              <div style={{ width: 44, height: 44, background: '#0B2D6F', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <i className="bi bi-graph-up" style={{ color: '#00B4D8', fontSize: 20 }} />
+              </div>
+              <div>
+                <h2 className="page-title-hh">Health History</h2>
+                <p className="page-subtitle-hh">Your complete heart rate scan history</p>
+              </div>
+            </div>
+            <button className="btn-navy btn-sm-hh" onClick={() => navigate('/patient/scan')}>
+              <i className="bi bi-plus-circle" /> New Scan
+            </button>
+          </div>
         </div>
 
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="spinner" /></div>
-        ) : reports.length === 0 ? (
-          <div className="card" style={{ textAlign: 'center', padding: '60px 32px' }}>
-            <div style={{ fontSize: 64, marginBottom: 16 }}>📊</div>
-            <h3 style={{ marginBottom: 8 }}>No History Yet</h3>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>Take your first heart scan to start tracking</p>
-            <button className="btn btn-primary" onClick={() => navigate('/patient/scan')}>Start First Scan</button>
+        {/* Stats */}
+        <div className="row g-3 mb-4">
+          {[
+            { label: 'Total Scans', value: history.length, icon: 'bi-clipboard-pulse', color: '#0B2D6F' },
+            { label: 'Average BPM', value: avg, icon: 'bi-heart-pulse', color: '#0B2D6F' },
+            { label: 'Highest BPM', value: max, icon: 'bi-arrow-up-circle', color: '#DC2626' },
+            { label: 'Normal Rate', value: `${normalPct}%`, icon: 'bi-shield-check', color: '#059669' },
+          ].map((s, i) => (
+            <div className="col-6 col-lg-3" key={s.label}>
+              <div className={`stat-card animate-fadeInUp delay-${i + 1}`}>
+                <div className="d-flex align-items-center justify-content-between mb-2">
+                  <div className="stat-card-label">{s.label}</div>
+                  <i className={`bi ${s.icon}`} style={{ color: s.color, fontSize: 18 }} />
+                </div>
+                <div className="stat-card-value" style={{ color: s.color }}>{s.value}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Chart */}
+        {chartData.length > 1 && (
+          <div className="hh-card mb-4 animate-fadeInUp delay-2">
+            <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, marginBottom: 20 }}>
+              <i className="bi bi-activity me-2" style={{ color: '#0B2D6F' }} />Heart Rate Trend
+            </h5>
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                <YAxis domain={[40, 140]} tick={{ fontSize: 11, fill: '#94A3B8' }} />
+                <Tooltip contentStyle={{ background: '#0B2D6F', border: 'none', borderRadius: 10, color: 'white', fontSize: 13 }} />
+                <ReferenceLine y={60} stroke="#059669" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: '60', fill: '#059669', fontSize: 11 }} />
+                <ReferenceLine y={100} stroke="#D97706" strokeDasharray="4 4" strokeWidth={1.5} label={{ value: '100', fill: '#D97706', fontSize: 11 }} />
+                <Line type="monotone" dataKey="bpm" stroke="#0B2D6F" strokeWidth={2.5} dot={{ fill: '#00B4D8', r: 4, strokeWidth: 2, stroke: 'white' }} activeDot={{ r: 6, fill: '#0B2D6F' }} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
-        ) : (
-          <>
-            {/* Stats */}
-            <div className="stats-grid" style={{ marginBottom: 28 }}>
-              <div className="stat-card">
-                <div className="stat-label">Total Scans</div>
-                <div className="stat-value">{reports.length}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Average BPM</div>
-                <div className="stat-value">{avg}</div>
-                <div className="stat-sub">resting heart rate</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Range</div>
-                <div className="stat-value" style={{ fontSize: 22 }}>{min}–{max}</div>
-                <div className="stat-sub">BPM</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Normal Readings</div>
-                <div className="stat-value" style={{ color: 'var(--success)' }}>
-                  {reports.length ? Math.round(normalCount / reports.length * 100) : 0}%
-                </div>
-                <div className="stat-sub">{normalCount} of {reports.length}</div>
-              </div>
-            </div>
+        )}
 
-            {/* Chart */}
-            <div className="card" style={{ marginBottom: 24 }}>
-              <h3 style={{ fontSize: 16, marginBottom: 24 }}>Heart Rate Trend</h3>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, bottom: 0, left: -10 }}>
-                  <defs>
-                    <linearGradient id="bpmGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#C41E3A" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#C41E3A" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                  <XAxis dataKey="date" tick={{ fill: '#4A5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <YAxis domain={[40, 130]} tick={{ fill: '#4A5568', fontSize: 11 }} axisLine={false} tickLine={false} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <ReferenceLine y={100} stroke="#F59E0B" strokeDasharray="4 4" label={{ value: '100', fill: '#F59E0B', fontSize: 11, position: 'right' }} />
-                  <ReferenceLine y={60} stroke="#3B82F6" strokeDasharray="4 4" label={{ value: '60', fill: '#3B82F6', fontSize: 11, position: 'right' }} />
-                  <Area type="monotone" dataKey="bpm" stroke="#C41E3A" strokeWidth={2.5} fill="url(#bpmGrad)" dot={{ fill: '#E63950', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, fill: '#FF6B8A' }} />
-                </AreaChart>
-              </ResponsiveContainer>
-              <div style={{ display: 'flex', gap: 20, marginTop: 12, fontSize: 12, color: 'var(--text-muted)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 24, height: 2, background: '#F59E0B' }} /> Warning threshold (100 BPM)
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div style={{ width: 24, height: 2, background: '#3B82F6' }} /> Low threshold (60 BPM)
-                </div>
-              </div>
+        {/* Filter tabs */}
+        <div className="hh-card animate-fadeInUp delay-3">
+          <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+            <h5 style={{ fontFamily: 'Poppins', fontWeight: 700, margin: 0 }}>All Readings</h5>
+            <div className="d-flex gap-2 flex-wrap">
+              {['All', 'Normal', 'Warning', 'High Risk'].map(f => (
+                <button key={f} onClick={() => setFilter(f)} style={{
+                  padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', transition: 'all 0.2s', fontFamily: 'DM Sans',
+                  border: filter === f ? 'none' : '1.5px solid #E2E8F0',
+                  background: filter === f ? '#0B2D6F' : 'transparent',
+                  color: filter === f ? 'white' : '#64748B',
+                }}>
+                  {f} {f === 'All' ? `(${history.length})` : `(${history.filter(r => r.status === f).length})`}
+                </button>
+              ))}
             </div>
+          </div>
 
-            {/* Reports list */}
-            <div className="card">
-              <h3 style={{ fontSize: 16, marginBottom: 20 }}>All Readings</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {reports.map((r, i) => (
-                  <div key={r._id} style={{
+          {filtered.length === 0 ? (
+            <div className="text-center py-5">
+              <i className="bi bi-inbox" style={{ fontSize: 40, color: '#CBD5E1' }} />
+              <p style={{ color: '#94A3B8', marginTop: 12 }}>No records found</p>
+            </div>
+          ) : (
+            <div className="d-flex flex-column gap-2">
+              {filtered.map((r, i) => (
+                <div key={r._id}
+                  className="animate-fadeInUp"
+                  style={{
+                    animationDelay: `${i * 0.05}s`, opacity: 0,
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '14px 16px',
-                    background: i % 2 === 0 ? 'var(--bg-surface)' : 'transparent',
-                    borderRadius: 10,
-                    border: '1px solid var(--border)',
-                    cursor: 'pointer',
-                    transition: 'var(--transition)'
+                    padding: '14px 16px', background: '#F8FAFC',
+                    borderRadius: 10, border: '1px solid #E2E8F0',
+                    cursor: 'pointer', transition: 'all 0.2s'
                   }}
-                    onClick={() => navigate(`/patient/results/${r._id}`)}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                      <div style={{
-                        width: 44, height: 44,
-                        borderRadius: '50%',
-                        background: `${statusColor[r.status]}20`,
-                        border: `2px solid ${statusColor[r.status]}`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 18, fontWeight: 800,
-                        color: statusColor[r.status]
-                      }}>{r.heartRate}</div>
-                      <div>
-                        <div style={{ fontWeight: 600, fontSize: 15 }}>{r.heartRate} BPM</div>
-                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                          {new Date(r.createdAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </div>
+                  onMouseEnter={e => { e.currentTarget.style.background = '#EFF6FF'; e.currentTarget.style.borderColor = '#BFDBFE'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#F8FAFC'; e.currentTarget.style.borderColor = '#E2E8F0'; }}
+                  onClick={() => navigate(`/patient/results/${r._id}`)}
+                >
+                  <div className="d-flex align-items-center gap-3">
+                    <div style={{
+                      width: 48, height: 48, borderRadius: '50%',
+                      border: `2.5px solid ${statusColor[r.status]}`,
+                      background: `${statusColor[r.status]}12`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontFamily: 'Poppins', fontSize: 14, fontWeight: 800,
+                      color: statusColor[r.status]
+                    }}>{r.heartRate}</div>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#0F172A' }}>{r.heartRate} BPM</div>
+                      <div style={{ fontSize: 12, color: '#64748B' }}>
+                        <i className="bi bi-calendar3 me-1" />
+                        {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        <span className="mx-2">·</span>
+                        {new Date(r.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
-                    <span className={`badge badge-${r.status === 'Normal' ? 'normal' : r.status === 'Warning' ? 'warning' : 'danger'}`}>
-                      {r.status}
-                    </span>
                   </div>
-                ))}
-              </div>
+                  <div className="d-flex align-items-center gap-2">
+                    <span className={`badge-hh ${statusBadge[r.status]}`}>{r.status}</span>
+                    <i className="bi bi-chevron-right" style={{ color: '#CBD5E1', fontSize: 12 }} />
+                  </div>
+                </div>
+              ))}
             </div>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
