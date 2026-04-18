@@ -35,6 +35,7 @@ export default function DoctorDashboard() {
             req,
             ...prev,
           ]);
+
           setAll((prev) => [
             req,
             ...prev,
@@ -44,10 +45,11 @@ export default function DoctorDashboard() {
     }
 
     return () => {
-      if (socket)
+      if (socket) {
         socket.off(
           'new_consultation_request'
         );
+      }
     };
   }, [token]);
 
@@ -86,9 +88,9 @@ export default function DoctorDashboard() {
   );
 
   const statusColor = {
-    Normal: '#10B981',
+    Normal: '#0B2D6F',
     Warning: '#F59E0B',
-    'High Risk': '#EF4444',
+    'High Risk': '#DC2626',
   };
 
   if (loading) {
@@ -104,26 +106,28 @@ export default function DoctorDashboard() {
       <Sidebar />
 
       <div className="main-content">
-        {/* Hero Section */}
+
+        {/* HERO */}
         <div
           style={{
             background:
-              'linear-gradient(135deg,#065F46,#10B981)',
-            borderRadius: 18,
-            padding: 28,
+              'linear-gradient(135deg,#071D49,#0B2D6F)',
+            borderRadius: 20,
+            padding: 30,
             color: 'white',
             marginBottom: 28,
             boxShadow:
-              '0 12px 30px rgba(16,185,129,0.2)',
+              '0 14px 32px rgba(11,45,111,0.22)',
           }}
         >
           <div className="d-flex justify-content-between align-items-center flex-wrap gap-3">
+
             <div>
               <p
                 style={{
-                  opacity: 0.8,
                   marginBottom: 8,
-                  fontSize: 13,
+                  fontSize: 12,
+                  opacity: 0.75,
                   textTransform:
                     'uppercase',
                   letterSpacing:
@@ -136,7 +140,7 @@ export default function DoctorDashboard() {
               <h2
                 style={{
                   margin: 0,
-                  fontWeight: 700,
+                  fontWeight: 800,
                 }}
               >
                 Welcome, Dr.{' '}
@@ -144,14 +148,13 @@ export default function DoctorDashboard() {
                   user?.name?.split(
                     ' '
                   )[0]
-                }{' '}
-                👨‍⚕️
+                }
               </h2>
 
               <p
                 style={{
                   marginTop: 8,
-                  opacity: 0.9,
+                  opacity: 0.85,
                 }}
               >
                 {
@@ -169,20 +172,22 @@ export default function DoctorDashboard() {
                 background:
                   'rgba(255,255,255,0.12)',
                 padding:
-                  '16px 22px',
+                  '16px 24px',
                 borderRadius: 14,
                 textAlign:
                   'center',
+                minWidth: 130,
               }}
             >
               <div
                 style={{
                   fontSize: 13,
-                  opacity: 0.85,
+                  opacity: 0.75,
                 }}
               >
                 Pending
               </div>
+
               <div
                 style={{
                   fontSize: 34,
@@ -195,7 +200,7 @@ export default function DoctorDashboard() {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* STATS */}
         <div className="row g-3 mb-4">
           {[
             {
@@ -203,7 +208,8 @@ export default function DoctorDashboard() {
                 'Pending Requests',
               value:
                 pending.length,
-              icon: '⏳',
+              icon:
+                'bi-hourglass-split',
               color:
                 '#F59E0B',
             },
@@ -212,25 +218,29 @@ export default function DoctorDashboard() {
                 'Active Chats',
               value:
                 accepted.length,
-              icon: '💬',
+              icon:
+                'bi-chat-dots',
               color:
-                '#10B981',
+                '#0B2D6F',
             },
             {
               label:
                 'Total Patients',
-              value: all.length,
-              icon: '👥',
+              value:
+                all.length,
+              icon:
+                'bi-people',
               color:
-                '#3B82F6',
+                '#2563EB',
             },
             {
               label:
                 'Experience',
               value: `${user?.yearsOfExperience} yrs`,
-              icon: '🏆',
+              icon:
+                'bi-award',
               color:
-                '#8B5CF6',
+                '#7C3AED',
             },
           ].map((item) => (
             <div
@@ -241,15 +251,16 @@ export default function DoctorDashboard() {
                 style={{
                   background:
                     'white',
-                  borderRadius: 16,
-                  padding: 20,
+                  borderRadius: 18,
+                  padding: 22,
                   boxShadow:
-                    '0 8px 20px rgba(0,0,0,0.05)',
+                    '0 10px 22px rgba(0,0,0,0.05)',
                   height:
                     '100%',
                 }}
               >
                 <div className="d-flex justify-content-between align-items-center">
+
                   <div>
                     <div
                       style={{
@@ -279,21 +290,27 @@ export default function DoctorDashboard() {
 
                   <div
                     style={{
-                      fontSize: 26,
+                      fontSize: 24,
+                      color:
+                        item.color,
                     }}
                   >
-                    {item.icon}
+                    <i
+                      className={`bi ${item.icon}`}
+                    />
                   </div>
+
                 </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Pending Requests */}
+        {/* PENDING REQUESTS */}
         <div
           style={{
-            background: 'white',
+            background:
+              'white',
             borderRadius: 18,
             padding: 24,
             marginBottom: 24,
@@ -304,21 +321,24 @@ export default function DoctorDashboard() {
           <h4
             style={{
               marginBottom: 20,
-              fontWeight: 700,
+              fontWeight: 800,
+              color:
+                '#0F172A',
             }}
           >
             Pending Requests
           </h4>
 
-          {pending.length === 0 ? (
+          {pending.length ===
+          0 ? (
             <p
               style={{
                 color:
                   '#64748B',
+                margin: 0,
               }}
             >
-              No pending
-              consultations.
+              No pending consultations.
             </p>
           ) : (
             pending.map((c) => (
@@ -333,10 +353,12 @@ export default function DoctorDashboard() {
                 }}
               >
                 <div className="d-flex justify-content-between flex-wrap gap-3">
+
                   <div>
                     <h5
                       style={{
                         margin: 0,
+                        fontWeight: 700,
                       }}
                     >
                       {
@@ -376,9 +398,15 @@ export default function DoctorDashboard() {
                                 .status
                             ],
                           fontWeight: 700,
+                          display:
+                            'flex',
+                          alignItems:
+                            'center',
+                          gap: 6,
                         }}
                       >
-                        ❤️{' '}
+                        <i className="bi bi-heart-pulse-fill" />
+
                         {
                           c
                             .heartReport
@@ -396,7 +424,15 @@ export default function DoctorDashboard() {
 
                   <div className="d-flex gap-2">
                     <button
-                      className="btn btn-success"
+                      className="btn"
+                      style={{
+                        background:
+                          '#0B2D6F',
+                        color:
+                          'white',
+                        border:
+                          'none',
+                      }}
                       onClick={() =>
                         respond(
                           c._id,
@@ -419,13 +455,14 @@ export default function DoctorDashboard() {
                       Reject
                     </button>
                   </div>
+
                 </div>
               </div>
             ))
           )}
         </div>
 
-        {/* Active Consultations */}
+        {/* ACTIVE CHATS */}
         {accepted.length >
           0 && (
           <div
@@ -441,7 +478,7 @@ export default function DoctorDashboard() {
             <h4
               style={{
                 marginBottom: 20,
-                fontWeight: 700,
+                fontWeight: 800,
               }}
             >
               Active Chats
@@ -487,7 +524,13 @@ export default function DoctorDashboard() {
                   </div>
 
                   <button
-                    className="btn btn-primary"
+                    className="btn"
+                    style={{
+                      background:
+                        '#0B2D6F',
+                      color:
+                        'white',
+                    }}
                     onClick={() =>
                       navigate(
                         `/doctor/chat/${c._id}`
@@ -501,6 +544,7 @@ export default function DoctorDashboard() {
             )}
           </div>
         )}
+
       </div>
     </div>
   );
